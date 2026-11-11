@@ -1,8 +1,10 @@
 name: test
 on:
   push:
+    branches: ['**']
   pull_request:
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 jobs:
@@ -17,7 +19,22 @@ jobs:
       - uses: actions/checkout@v4
       - run: bash tests/fetch.sh '${{ matrix.arch }}'
       - run: docker build --build-arg BASE='${{ matrix.base }}' -f tests/Dockerfile -t xray-test .
-      - run: docker run --rm --cap-add NET_ADMIN -v "$PWD:/src:ro" xray-test
+      - name: Real core and TLS integration
+        run: |
+          set +e
+          docker run --rm --cap-add NET_ADMIN -v "$PWD:/src:ro" xray-test > integration.log 2>&1
+          result=$?
+          cat integration.log
+          if [ "$result" -ne 0 ]; then
+            python3 - <<'PY'
+          from pathlib import Path
+          lines = Path('integration.log').read_text(errors='replace').splitlines()
+          message = '\n'.join(lines[-60:])
+          message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+          print(f'::error title=Integration failure::{message}')
+          PY
+          fi
+          exit "$result"
       - name: Real systemd lifecycle
         run: |
           docker run -d --name xray-systemd --privileged --cgroupns private --tmpfs /run --tmpfs /run/lock --tmpfs /tmp -v "$PWD:/src:ro" xray-test /sbin/init

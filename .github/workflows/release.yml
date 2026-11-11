@@ -5,7 +5,12 @@ on:
 permissions:
   contents: write
 jobs:
+  verify:
+    uses: ./.github/workflows/test.yml
+    permissions:
+      contents: read
   release:
+    needs: verify
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

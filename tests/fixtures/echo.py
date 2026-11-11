@@ -1,4 +1,5 @@
 import http.server
+import itertools
 import socket
 import socketserver
 import threading
@@ -10,7 +11,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         if self.path == '/stream':
             try:
-                for i in range(600):
+                # The test controls the lifetime. A fixed 60-second response
+                # expires during slower CI runs and falsely looks like a drop.
+                for i in itertools.count():
                     self.wfile.write(('%s %d\n' % (self.client_address[0], i)).encode())
                     self.wfile.flush()
                     time.sleep(.1)
