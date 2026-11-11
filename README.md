@@ -16,7 +16,7 @@
 curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://github.com/tktkl/Xray/releases/download/v0.1.0/install.sh && sudo bash xray-install.sh
 ```
 
-**在线安装需要对应版本的 GitHub Release 包含 `install.sh`、源码包和 `SHA256SUMS` 三份附件。仅推送代码不会生成发布附件；推送 `v0.1.0` 标签后由发布工作流生成。**
+[v0.1.0 已发布](https://github.com/tktkl/Xray/releases/tag/v0.1.0)，包含 `install.sh`、源码包和 `SHA256SUMS` 三份附件。后续版本在标签对应的完整 CI 全部通过后自动发布。
 
 也可以只把 `bootstrap.sh` 拷到服务器运行，无需 Git 或完整源码：
 

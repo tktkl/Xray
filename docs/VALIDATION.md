@@ -27,13 +27,19 @@
 - CI 长连接夹具改为由测试主动结束，避免慢环境超过原 60 秒上限导致误判；本地半核容器超过 100 秒的核心隔离、API 对账和七处中断恢复测试通过。
 - Release 工作流先运行四个发行版、两个架构的完整 CI，全部成功后才发布安装附件。
 
+## 2026-11-11：v0.1.0 正式发布
+
+- 标签 `v0.1.0` 对应提交 `48576e5943072feb7f4f74a983a0751a2aa500fe`。正式发布工作流 [42946938147](https://github.com/tktkl/Xray/actions/runs/42946938147) 成功，Debian 12/13、Ubuntu 22.04/24.04 的 amd64/arm64 共八个环境通过完整集成及 systemd 测试。
+- 从公开 GitHub Release 实际下载 `install.sh`、`SHA256SUMS`、`xray-manager-v0.1.0.tar.gz`，核对两个 SHA256，并确认运行源码与经过测试的标签一致。
+- 干净的 Ubuntu 24.04 ARM64 systemd 容器从真实 Release 在线下载安装入口和程序包，核心及规则使用已校验的离线缓存；服务启动、节点添加/查看/校验/删除及卸载通过。
+
 ## 测试边界
 
 - REALITY 客户端握手使用本地 TLS 1.3/H2 目标；测试开关只在 `/tmp/` 隔离状态目录生效。两个真实 Apple 站点的可达性必须在部署服务器检查。
 - 证书测试使用本地 CA。真实 Cloudflare DNS-01、生产 ACME 限流及公网 DNS 传播需要自有测试域名和凭据，尚未执行。
-- Debian 13、Ubuntu 22.04 及 amd64 原生运行由 CI 矩阵覆盖配置；本地未将其标记为已经通过。当前 Docker 的 amd64 仿真未启用。
+- 八个发行版/架构组合已由正式发布 CI 验证；本地 Docker 的 amd64 仿真未启用，不将远端原生 CI 结果表述为本地运行。
 - 故障注入模拟进程中断和服务启动恢复，不等同于真实存储设备突然断电。实现使用同步持久化及原子提交，但仍取决于宿主文件系统和存储设备的保证。
 - SOCKS5 上游 UDP 可用性取决于上游实现；HTTP CONNECT 明确不支持 UDP。
-- 真实 GitHub Release 在线下载及系统软件包升级仍需实际发布/软件源；本地模拟附件的安装升级测试不代表已完成线上发布。
+- 真实 GitHub Release 在线下载及初次安装已验证；系统软件包升级与真实 ACME 签发仍需对应软件源/测试凭据。
 
 复现入口：`tests/run.sh`、`tests/integration/systemd.sh`；CI：`.github/workflows/test.yml`。
