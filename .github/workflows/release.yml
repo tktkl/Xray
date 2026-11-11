@@ -1,0 +1,19 @@
+name: release
+on:
+  push:
+    tags: ['v*.*.*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build reviewable source archive
+        run: |
+          shellcheck -S warning bin/xray install.sh bootstrap.sh scripts/*.sh lib/*.sh
+          bash scripts/package-release.sh "$GITHUB_REF_NAME"
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "dist/xray-manager-${GITHUB_REF_NAME}.tar.gz" dist/SHA256SUMS dist/install.sh --generate-notes

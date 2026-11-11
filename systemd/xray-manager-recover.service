@@ -1,0 +1,12 @@
+[Unit]
+Description=Restore committed Xray manager configuration
+After=local-fs.target
+Before=xray-manager.service nginx.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/xray-manager/bin/xray recover --offline
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,25 @@
+services:
+  test:
+    image: tktkl-xray-test:${TEST_TAG:-ubuntu24}
+    build:
+      context: .
+      dockerfile: tests/Dockerfile
+      args:
+        BASE: ${TEST_BASE:-ubuntu:24.04}
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - .:/src:ro
+    working_dir: /src
+    command: ["bash", "tests/run.sh"]
+  systemd:
+    image: tktkl-xray-test:${TEST_TAG:-ubuntu24}
+    privileged: true
+    cgroup: private
+    tmpfs:
+      - /run
+      - /run/lock
+      - /tmp
+    volumes:
+      - .:/src:ro
+    command: ["/sbin/init"]

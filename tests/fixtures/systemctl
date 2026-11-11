@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Only used in isolated test containers without systemd. Core/API are real.
+set -eu
+root=${XRAY_MANAGER_ROOT:?}
+case ${1:-} in
+    is-active)
+        service=${!#}
+        if [[ $service == xray-manager.service ]]; then [[ -e $root/core.pid ]] && kill -0 "$(cat "$root/core.pid")" 2>/dev/null
+        elif [[ $service == nginx.service ]]; then [[ -e /run/nginx.pid ]] && kill -0 "$(cat /run/nginx.pid)" 2>/dev/null
+        else exit 1; fi;;
+    show)
+        if [[ -e $root/core.pid ]] && kill -0 "$(cat "$root/core.pid")" 2>/dev/null; then
+            pid=$(cat "$root/core.pid"); printf '%s\n' "$pid"; awk '{print $22}' "/proc/$pid/stat"
+        else printf '0\n0\n'; fi;;
+    reload) nginx -s reload;;
+    start|stop|restart)
+        printf '%s\n' "$*" >> "$root/systemctl-calls"
+        # Never launch the deploy worker synchronously from Certbot's hook.
+        if [[ ${2:-} == --no-block ]]; then exit 0; fi
+        case ${2:-} in
+            nginx.service) if [[ $1 == start ]]; then nginx; elif [[ $1 == stop ]]; then nginx -s stop; else nginx -s reload; fi;;
+            *) exit 0;;
+        esac;;
+    cat) exit 1;;
+    *) exit 0;;
+esac

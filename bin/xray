@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Independently implemented manager. The actual core is never installed on PATH.
+set -Eeuo pipefail
+umask 077
+if (( BASH_VERSINFO[0] < 4 )); then
+    printf '%s\n' '需要 Bash 4 或更新版本。' >&2
+    exit 1
+fi
+SELF_DIR=$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd -P)
+MANAGER_HOME=${XRAY_MANAGER_HOME:-$SELF_DIR}
+for module in common store uri protocol render nginx runtime cert install commands; do
+    # shellcheck source=/dev/null
+    source "$MANAGER_HOME/lib/$module.sh"
+done
+main "$@"

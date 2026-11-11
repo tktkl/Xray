@@ -1,0 +1,31 @@
+[Unit]
+Description=Independently managed Xray core
+After=network-online.target xray-manager-recover.service
+Wants=network-online.target
+Requires=xray-manager-recover.service
+StartLimitIntervalSec=60
+StartLimitBurst=20
+
+[Service]
+Type=simple
+User=xray-manager
+Group=xray-manager
+Environment=XRAY_LOCATION_ASSET=/usr/local/lib/xray-manager/core
+RuntimeDirectory=xray-manager
+RuntimeDirectoryMode=0700
+UMask=0077
+ExecStart=/usr/local/lib/xray-manager/core/xray run -c /var/lib/xray-manager/installed/config.json
+Restart=on-failure
+RestartSec=2
+RestartPreventExitStatus=23
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/xray-manager/logs /run/xray-manager
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,8 @@
+[Unit]
+Description=Deploy queued Xray manager certificates
+After=network-online.target
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/local/lib/xray-manager/bin/xray cert deploy

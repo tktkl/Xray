@@ -1,0 +1,29 @@
+name: test
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integration:
+    strategy:
+      fail-fast: false
+      matrix:
+        base: ['debian:12', 'debian:13', 'ubuntu:22.04', 'ubuntu:24.04']
+        arch: [amd64, arm64]
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash tests/fetch.sh '${{ matrix.arch }}'
+      - run: docker build --build-arg BASE='${{ matrix.base }}' -f tests/Dockerfile -t xray-test .
+      - run: docker run --rm --cap-add NET_ADMIN -v "$PWD:/src:ro" xray-test
+      - name: Real systemd lifecycle
+        run: |
+          docker run -d --name xray-systemd --privileged --cgroupns private --tmpfs /run --tmpfs /run/lock --tmpfs /tmp -v "$PWD:/src:ro" xray-test /sbin/init
+          for attempt in $(seq 1 30); do
+            docker exec xray-systemd systemctl is-system-running --wait && break || sleep 1
+          done
+          docker exec -e XRAY_TEST_RELEASE_BOOTSTRAP=1 xray-systemd bash /src/tests/integration/systemd.sh
+      - if: always()
+        run: docker rm -f xray-systemd || true

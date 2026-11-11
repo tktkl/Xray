@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Offline public Release fixture. Any attempt to send credentials is rejected.
+set -Eeuo pipefail
+output='' url=''
+for argument in "$@"; do
+    case $argument in *Authorization*|*github_pat*|*api.github.com*) exit 3;; esac
+done
+while (($#)); do
+    case $1 in
+        --output) output=$2; shift 2;;
+        https://github.com/*) url=$1; shift;;
+        *) shift;;
+    esac
+done
+[[ ${BOOTSTRAP_HTTP_FAIL:-0} == 0 ]] || exit 22
+case $url in
+    https://github.com/tktkl/Xray/releases/download/v0.1.0/xray-manager-v0.1.0.tar.gz)
+        cp "$BOOTSTRAP_FIXTURE/xray-manager-v0.1.0.tar.gz" "$output";;
+    https://github.com/tktkl/Xray/releases/download/v0.1.0/SHA256SUMS)
+        cp "$BOOTSTRAP_FIXTURE/SHA256SUMS" "$output";;
+    *) exit 22;;
+esac

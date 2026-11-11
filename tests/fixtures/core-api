@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -eu
+real=/opt/xray-core/xray
+if [[ ${1:-} == api && ${2:-} == "${XRAY_TEST_API_COMMAND:-adrules}" ]]; then
+    marker="${XRAY_MANAGER_ROOT:?}/api-fault-${XRAY_TEST_API_MODE:-after}"
+    if [[ ! -e $marker ]]; then
+        : > "$marker"
+        if [[ ${XRAY_TEST_API_MODE:-after} == before ]]; then exit 1; fi
+        "$real" "$@" >/dev/null
+        # Simulate a committed request whose reply was lost.
+        exit 1
+    fi
+fi
+exec "$real" "$@"

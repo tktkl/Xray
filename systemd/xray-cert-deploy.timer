@@ -1,0 +1,11 @@
+[Unit]
+Description=Retry pending certificate deployments every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=5min
+Persistent=true
+Unit=xray-cert-deploy.service
+
+[Install]
+WantedBy=timers.target

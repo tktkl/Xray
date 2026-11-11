@@ -1,0 +1,13 @@
+{
+  "core": {
+    "v26.11.9": {
+      "amd64": {"asset": "Xray-linux-64.zip", "sha256": "b651f7e1d9966ee2c1b1ee1bf8b52c72771824d3065dce96bbc8bcc19ed95f82"},
+      "arm64": {"asset": "Xray-linux-arm64-v8a.zip", "sha256": "64ed6858982a7f5eb85d88b811089063bd4f17561f4c8f44e0f1dc8e6f6430be"}
+    }
+  },
+  "data": {
+    "version": "202611092204",
+    "geoip.dat": "90b78ab861c1cdc3f871f305f9ceedfb8d6d6329e3a40295e6773e057297384c",
+    "geosite.dat": "bd2b6303c4ad7cef801744d2ecb03323a665605834c2b6f8f6348bd18df448e5"
+  }
+}
