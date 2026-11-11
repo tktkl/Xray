@@ -29,7 +29,8 @@ jobs:
             python3 - <<'PY'
           from pathlib import Path
           lines = Path('integration.log').read_text(errors='replace').splitlines()
-          message = '\n'.join(lines[-60:])
+          lines = [line for line in lines if ' [warn] ' not in line]
+          message = '\n'.join(lines[-25:])[-3500:]
           message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
           print(f'::error title=Integration failure::{message}')
           PY

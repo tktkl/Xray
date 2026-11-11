@@ -8,7 +8,7 @@ cleanup() {
     teardown_manager
 }
 trap cleanup EXIT
-trap 'printf "FAILED at line %s\n" "$LINENO" >&2; cat "$ROOT"/core.log 2>/dev/null || true' ERR
+trap 'printf "::error title=Core integration failed::line %s, status %s\n" "$LINENO" "$?" >&2; cat "$ROOT"/core.log 2>/dev/null || true' ERR
 assert() { "$@" || { printf 'Assertion failed: %s\n' "$*" >&2; return 1; }; }
 ip address add 8.8.4.4/32 dev lo
 ip address add 114.114.114.114/32 dev lo

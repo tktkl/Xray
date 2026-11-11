@@ -9,7 +9,7 @@ LE_DIR=$XRAY_LE_DIR
 PIDS=()
 cleanup() { for p in "${PIDS[@]}"; do kill "$p" 2>/dev/null || true; done; nginx -s stop 2>/dev/null || true; rm -f /etc/nginx/conf.d/{xray-manager,test-target}.conf; teardown_manager; }
 trap cleanup EXIT
-trap 'echo "TLS test failed at line $LINENO" >&2' ERR
+trap 'echo "::error title=TLS integration failed::line $LINENO, status $?" >&2' ERR
 lineage="$LE_DIR/live/xray-example.test"
 mkdir -p "$lineage" "$ROOT/managed-certificates"
 openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj /CN=Xray-Test-CA -keyout "$ROOT/ca.key" -out "$ROOT/ca.crt" >/dev/null 2>&1
