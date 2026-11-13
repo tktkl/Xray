@@ -177,13 +177,41 @@ wait_api() {
     for ((i=0;i<20;i++)); do if api_json lsi --isOnlyTags=true >/dev/null 2>&1; then return; fi; sleep 0.5; done
     return 1
 }
+latest_manager_version() {
+    local destination
+    need curl || return
+    destination=$(curl --fail --silent --show-error --location --user-agent 'Xray-independent-updater' \
+        --proto '=https' --proto-redir '=https' --tlsv1.2 --retry 2 \
+        --connect-timeout 15 --max-time 60 --output /dev/null --write-out '%{url_effective}' \
+        'https://github.com/tktkl/Xray/releases/latest') || {
+        die '无法查询最新正式版，请检查网络，或指定已发布版本。'; return;
+    }
+    [[ $destination =~ ^https://github\.com/tktkl/Xray/releases/tag/(v[0-9]+\.[0-9]+\.[0-9]+)$ ]] || {
+        die '最新正式版地址无效，未更新脚本。'; return;
+    }
+    printf '%s' "${BASH_REMATCH[1]}"
+}
 update_manager() {
-    local version=${1:-} tmp install_home=/usr/local/lib/xray-manager release previous code_fd f
-    (($#==0)) || shift
-    [[ $version =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { die "请指定脚本版本，例如 update sh v$VERSION。"; return; }
+    local version=latest tmp install_home=/usr/local/lib/xray-manager release previous code_fd f
+    local -a download_options=()
+    if (($#)) && [[ $1 != -* ]]; then version=${1:-latest}; shift; fi
+    while (($#)); do
+        case $1 in
+            --sha256)
+                [[ $# -ge 2 && ${2:-} =~ ^[a-fA-F0-9]{64}$ ]] || { die '指定的 SHA256 格式不正确。'; return; }
+                download_options+=(--sha256 "$2"); shift 2;;
+            *) die '用法：xray update sh [版本|latest] [--sha256 SHA256]'; return;;
+        esac
+    done
+    if [[ $version == latest ]]; then
+        version=$(latest_manager_version) || return
+        if [[ $version == "v$VERSION" ]]; then note "管理脚本已是最新正式版 $version。"; return; fi
+        note "最新正式版：$version。"
+    fi
+    [[ $version =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { die "版本格式应为 v数字.数字.数字；省略版本更新最新正式版。"; return; }
     [[ -f $MANAGER_HOME/bootstrap.sh ]] || { die '缺少 Release 下载入口，请使用新版安装包。'; return; }
     tmp=$(mktemp -d "$ROOT/script-update.XXXXXX")
-    if ! bash "$MANAGER_HOME/bootstrap.sh" --version "$version" --download-only "$tmp/source" "$@"; then
+    if ! bash "$MANAGER_HOME/bootstrap.sh" --version "$version" --download-only "$tmp/source" "${download_options[@]}"; then
         rm -rf "$tmp"; return 1
     fi
     [[ -x $tmp/source/bin/xray && -d $tmp/source/lib && -d $tmp/source/jq ]] || { rm -rf "$tmp"; die '发布包结构无效。'; return; }

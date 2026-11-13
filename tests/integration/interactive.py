@@ -182,7 +182,9 @@ with Terminal(BIN) as terminal:
 
     terminal.choose("Xray 管理菜单", "13")
     terminal.choose("选择更新组件", "2")
+    terminal.choose("选择脚本更新方式", "2")
     terminal.answer("已发布的脚本版本", "0")
+    terminal.choose("选择脚本更新方式", "0")
     terminal.choose("选择更新组件", "0")
 
     terminal.choose("Xray 管理菜单", "10")
@@ -363,4 +365,22 @@ with Terminal(BIN) as terminal:
     os.write(terminal.fd, b"\x04")
     terminal.finish()
 assert (ROOT / "current").resolve() == before
-print("PASS: numbered menus, immediate-parent Back, explicit Exit, single-node Back, EOF and CLI compatibility")
+
+# Versionless CLI aliases must not ask for a version even with an attached terminal.
+curl_fixture = ROOT / "test-bin/curl"
+curl_fixture.write_bytes(Path("/src/tests/fixtures/release-curl").read_bytes())
+curl_fixture.chmod(0o755)
+for args in (("update", "sh"), ("U",), ("update.sh",)):
+    with Terminal(BIN, *args) as terminal:
+        terminal.expect("已是最新正式版")
+        terminal.finish()
+        assert "已发布的脚本版本" not in terminal.transcript.decode()
+with Terminal(BIN) as terminal:
+    terminal.choose("Xray 管理菜单", "13")
+    terminal.choose("选择更新组件", "2")
+    terminal.choose("选择脚本更新方式", "1")
+    terminal.expect("已是最新正式版")
+    terminal.choose("Xray 管理菜单", "0")
+    terminal.finish()
+assert (ROOT / "current").resolve() == before
+print("PASS: numbered menus, immediate-parent Back, Exit, EOF, versionless updates and CLI compatibility")

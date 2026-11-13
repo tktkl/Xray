@@ -41,12 +41,36 @@ DOWNLOAD_CACHE=/src/.cache xray update dat
 systemctl is-active --quiet xray-manager.service
 if [[ -n $release_fixture ]]; then
     before=$(systemctl show xray-manager.service --property=MainPID --value)
+    nodes_before=$(sha256sum /var/lib/xray-manager/current/nodes/*.json)
+    generation_before=$(readlink -f /var/lib/xray-manager/current)
     previous_code=$(readlink -f /usr/local/lib/xray-manager/code-current)
     PATH="$release_fixture/bin:$PATH" BOOTSTRAP_FIXTURE="$release_fixture/release" \
         xray update sh "$version"
     [[ $(systemctl show xray-manager.service --property=MainPID --value) == "$before" ]]
     [[ $(readlink -f /usr/local/lib/xray-manager/code-current) != "$previous_code" ]]
-    printf 'PASS: public Release installation and verified atomic script update without GitHub credentials\n'
+    # A fixture release with an older version exercises an actual versionless upgrade.
+    mkdir "$release_fixture/older"
+    tar -xzf "$release_fixture/release/xray-manager-$version.tar.gz" -C "$release_fixture/older"
+    sed -i 's/^VERSION=.*/VERSION=0.0.0/' "$release_fixture/older/lib/common.sh"
+    sed -i "s/^DEFAULT_VERSION=.*/DEFAULT_VERSION='v0.0.0'/" "$release_fixture/older/bootstrap.sh"
+    tar -czf "$release_fixture/release/xray-manager-v0.0.0.tar.gz" -C "$release_fixture/older" .
+    (cd "$release_fixture/release" && sha256sum xray-manager-v0.0.0.tar.gz >> SHA256SUMS)
+    PATH="$release_fixture/bin:$PATH" BOOTSTRAP_FIXTURE="$release_fixture/release" BOOTSTRAP_VERSION=v0.0.0 \
+        xray update sh v0.0.0
+    previous_code=$(readlink -f /usr/local/lib/xray-manager/code-current)
+    PATH="$release_fixture/bin:$PATH" BOOTSTRAP_FIXTURE="$release_fixture/release" xray update sh
+    [[ $(xray version | sed -n '1p') == "Xray manager ${version#v}" ]]
+    [[ $(readlink -f /usr/local/lib/xray-manager/code-current) != "$previous_code" ]]
+    previous_code=$(readlink -f /usr/local/lib/xray-manager/code-current)
+    for invocation in U update.sh 'update sh latest'; do
+        read -r -a update_args <<< "$invocation"
+        PATH="$release_fixture/bin:$PATH" BOOTSTRAP_FIXTURE="$release_fixture/release" xray "${update_args[@]}"
+        [[ $(readlink -f /usr/local/lib/xray-manager/code-current) == "$previous_code" ]]
+    done
+    [[ $(systemctl show xray-manager.service --property=MainPID --value) == "$before" ]]
+    [[ $(sha256sum /var/lib/xray-manager/current/nodes/*.json) == "$nodes_before" ]]
+    [[ $(readlink -f /var/lib/xray-manager/current) == "$generation_before" ]]
+    printf 'PASS: verified script updates, latest resolution and aliases preserve core PID and nodes\n'
 fi
 # Simulate reboot with an uncommitted candidate installed on disk.
 systemctl stop xray-manager.service xray-manager-recover.service

@@ -1,20 +1,25 @@
 #!/usr/bin/env bash
 # Offline public Release fixture. Any attempt to send credentials is rejected.
 set -Eeuo pipefail
-output='' url=''
+output='' url='' write_out=''
 for argument in "$@"; do
     case $argument in *Authorization*|*github_pat*|*api.github.com*) exit 3;; esac
 done
 while (($#)); do
     case $1 in
         --output) output=$2; shift 2;;
+        --write-out) write_out=$2; shift 2;;
         https://github.com/*) url=$1; shift;;
         *) shift;;
     esac
 done
+[[ -z ${BOOTSTRAP_REQUESTS:-} ]] || printf '%s\n' "$url" >> "$BOOTSTRAP_REQUESTS"
 [[ ${BOOTSTRAP_HTTP_FAIL:-0} == 0 ]] || exit 22
 version=${BOOTSTRAP_VERSION:-v$(awk -F= '/^VERSION=/{print $2;exit}' /src/lib/common.sh)}
 case $url in
+    'https://github.com/tktkl/Xray/releases/latest')
+        [[ $write_out == '%{url_effective}' && $output == /dev/null ]] || exit 3
+        printf '%s' "${BOOTSTRAP_LATEST_URL-https://github.com/tktkl/Xray/releases/tag/$version}";;
     "https://github.com/tktkl/Xray/releases/download/$version/xray-manager-$version.tar.gz")
         cp "$BOOTSTRAP_FIXTURE/xray-manager-$version.tar.gz" "$output";;
     "https://github.com/tktkl/Xray/releases/download/$version/SHA256SUMS")

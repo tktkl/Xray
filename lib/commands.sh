@@ -33,7 +33,7 @@ help_text() {
       dns [none|11|88|google|cloudflare|family|set DNS]
       log [debug|info|warning|error|none|del]；logerr
       u, update [core|sh|dat|nginx|certbot] [版本]；U, update.sh [版本]
-      update sh 版本                 下载已校验的公开 Release 更新脚本
+      update sh [版本]               默认更新最新正式版；也可指定 Release
       install；reinstall；un, uninstall；bbr
 
 工具：v, version；ip；get-port；ss2022 [加密方式]；pbk
@@ -453,18 +453,29 @@ menu_log() {
         menu_run "$@"; return
     done
 }
-menu_update() {
+menu_update_script() {
     local choice version result
     while :; do
-        choice=$(menu_select '选择更新组件' core core 'Xray 核心（影响所有节点）' sh '管理脚本' dat '规则数据' \
-            nginx 'Nginx' certbot 'Certbot') || return
-        set -- update "$choice"
-        if [[ $choice == sh ]]; then
+        choice=$(menu_select '选择脚本更新方式' latest latest '更新最新正式版' version '指定已发布版本') || return
+        set -- update sh
+        if [[ $choice == version ]]; then
             if version=$(prompt_step "已发布的脚本版本（例如 v$VERSION）"); then :
             else result=$?; [[ $result == 125 ]] && continue; return "$result"; fi
             set -- "$@" "$version"
         fi
         menu_run "$@"; return
+    done
+}
+menu_update() {
+    local choice result
+    while :; do
+        choice=$(menu_select '选择更新组件' core core 'Xray 核心（影响所有节点）' sh '管理脚本' dat '规则数据' \
+            nginx 'Nginx' certbot 'Certbot') || return
+        if [[ $choice == sh ]]; then
+            if menu_update_script; then return
+            else result=$?; [[ $result == 125 ]] && continue; return "$result"; fi
+        fi
+        menu_run update "$choice"; return
     done
 }
 menu_repair() {
@@ -561,12 +572,11 @@ main() {
             if (($#==0)) && [[ -t 0 && $command != U && $command != update.sh ]]; then menu_update; return; fi
             target=${1:-core}; value=${2:-}
             [[ $command != U && $command != update.sh ]] || { target='sh'; value=${1:-}; }
-            if [[ $target == sh && -z $value && -t 0 ]]; then value=$(prompt_step "已发布的脚本版本（例如 v$VERSION）") || return; fi
             case $target in
                 core) update_core "${value:-v26.11.9}";;
                 sh)
-                    if [[ $command == U || $command == update.sh ]]; then update_manager "$value" "${@:2}"
-                    else update_manager "$value" "${@:3}"; fi;;
+                    if [[ $command == U || $command == update.sh ]]; then update_manager "$@"
+                    else update_manager "${@:2}"; fi;;
                 dat)
                     note '规则数据更新是全局操作。'; update_data;;
                 nginx|certbot)

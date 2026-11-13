@@ -11,7 +11,7 @@
 | dns/log/logerr | 保留；修改为全局操作 |
 | fix/fix-all/fix-config.json | 从源配置重建；fix-all 为全局操作 |
 | fix-caddyfile | 提示改用 fix-nginx |
-| update core/sh/dat | 固定兼容清单与摘要校验；sh 需要已发布版本 |
+| update core/sh/dat；U/update.sh | 核心与规则使用兼容清单；sh 默认最新正式版，也支持指定已发布版本 |
 | update caddy | 提示改用 update nginx / cert |
 | no-auto-tls | 创建本机后端，不接管前端 TLS |
 | api/bin/pbk/x25519/tls/run/uuid | 核心透传 |
@@ -22,7 +22,7 @@
 | dp/dynamicport | 与上游当前行为一致，明确不支持 |
 | bbr | 仅明确调用时配置 |
 
-更新脚本需指定发布标签，例如 `xray update sh v0.1.5`；从公开 Release 下载并校验摘要，无需 GitHub Token。创建 Release 之前不会假装存在更新包。Cloudflare Token 仍只用于 DNS-01 签发，与程序下载安装无关。
+`xray update sh`、`xray U`、`xray update.sh` 默认查询最新正式版，也接受 `latest`；指定版本如 `xray update sh v0.1.6` 仍然可用。查询成功后固定到具体发布标签，从公开 Release 下载并校验摘要，无需 GitHub Token。已是最新正式版时无需重复下载；网络或发布地址异常时停止，不回退分支源码。Cloudflare Token 仍只用于 DNS-01 签发，与程序下载安装无关。
 
 名字精确匹配优先，多个匹配时交互选择；非交互必须提供明确 ID。快捷修改命令同样可通过 `xray c n001 OPTION VALUE` 使用。
 

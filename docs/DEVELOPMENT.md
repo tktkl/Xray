@@ -27,7 +27,7 @@ amd64 主机将 `arm64` 换成 `amd64`。缓存只涵盖核心与规则文件，
 独立引导器只下载固定标签的公开 Release，无需 GitHub Token：
 
 ```bash
-sudo bash bootstrap.sh --version v0.1.5
+sudo bash bootstrap.sh --version v0.1.6
 ```
 
 未发布版本、网络失败、摘要异常或包路径不安全时停止，不回退到分支源码。可以通过 `--sha256` 指定另行核实的程序包摘要。摘要校验用于完整性检查，不能证明代码没有后门。
@@ -58,12 +58,12 @@ amd64 主机将下载参数改为 `amd64`。默认镜像基于 Ubuntu 24.04，�
 发布标签必须与 `lib/common.sh` 中的版本一致。本地打包：
 
 ```bash
-bash scripts/package-release.sh v0.1.5
+bash scripts/package-release.sh v0.1.6
 ```
 
 默认在 `dist/` 生成：
 
-- `xray-manager-v0.1.5.tar.gz`：程序源码包。
+- `xray-manager-v0.1.6.tar.gz`：程序源码包。
 - `install.sh`：独立安装入口。
 - `SHA256SUMS`：两个附件的 SHA256。
 

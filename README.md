@@ -12,7 +12,7 @@
 
 ```bash
 apt-get update && apt-get install -y curl ca-certificates
-curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://github.com/tktkl/Xray/releases/download/v0.1.5/install.sh && bash xray-install.sh
+curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://github.com/tktkl/Xray/releases/latest/download/install.sh && bash xray-install.sh
 ```
 
 安装后直接运行 `xray`。
@@ -21,7 +21,7 @@ curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://gith
 
 ```bash
 sudo apt-get update && sudo apt-get install -y curl ca-certificates
-curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://github.com/tktkl/Xray/releases/download/v0.1.5/install.sh && sudo bash xray-install.sh
+curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://github.com/tktkl/Xray/releases/latest/download/install.sh && sudo bash xray-install.sh
 ```
 
 安装后运行 `sudo xray`。普通用户没有 sudo 权限时，先执行 `su -` 切换到 root，再按 root 用户的步骤安装；安装和管理均需要 root 权限。
@@ -240,19 +240,22 @@ xray cert delete node.example.com
 | `xray dns none` | 恢复使用服务器 DNS |
 | `xray version` | 查看脚本和核心版本 |
 | `xray update core` | 安装兼容清单中的核心版本 |
+| `xray update sh`／`xray U` | 更新管理脚本到最新正式版 |
 | `xray update dat` | 更新规则数据 |
 | `xray uninstall` | 卸载受管程序和服务，保留配置备份、证书与凭据 |
 
 停止／重启 Xray、修改全局 DNS 和更新核心会影响所有节点。
 
-更新脚本需要指定已发布的版本标签，例如：
+更新管理脚本，无需填写版本号：
 
 ```bash
-xray update sh v0.1.5
+xray update sh
+# 快捷命令
+xray U
 ```
 
-`v0.1.5` 是当前版本示例，有新版时换成对应标签。可在 [Releases](https://github.com/tktkl/Xray/releases) 查看已发布版本。
+需要指定版本时，仍可执行 `xray update sh v0.1.6`。可在 [Releases](https://github.com/tktkl/Xray/releases) 查看已发布版本。脚本更新保留已有节点，不重启 Xray 核心。
 
-已安装旧版的用户执行上面的更新命令后，重新运行 `xray` 即可使用编号菜单，已有节点会保留。
+已安装 v0.1.5 或更早版本的用户，先执行一次 `xray update sh v0.1.6`，以后直接使用 `xray update sh` 即可。
 
 完整参数见 `xray help`；更多资料：[命令兼容表](docs/COMPATIBILITY.md) · [协议与出口能力](docs/PROTOCOLS.md) · [开发与测试](docs/DEVELOPMENT.md)。
