@@ -123,8 +123,8 @@ recover_state() {
         previous=$(jq -r .previous "$ROOT/core-upgrade.json")
         running=$(jq -r .was_running "$ROOT/core-upgrade.json")
         [[ $previous == "$ROOT/core-backups/previous" && -f $previous ]] || { die '核心恢复记录不合法。'; return; }
-        install -m 755 "$previous" "${CORE}.restore"
-        mv -f "${CORE}.restore" "$CORE"
+        install -m 755 "$previous" "${CORE}.restore" && sync_path "${CORE}.restore" &&
+            mv -f "${CORE}.restore" "$CORE" && sync_path "$(dirname -- "$CORE")" || return
         if [[ ${1:-} != offline && $running == true ]]; then systemctl restart xray-manager.service && wait_api || return; fi
         rm -f "$ROOT/core-upgrade.json"
     fi

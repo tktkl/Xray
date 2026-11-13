@@ -239,7 +239,8 @@ xray cert delete node.example.com
 | `xray dns cloudflare` | 将全局 DNS 改为 Cloudflare DoH |
 | `xray dns none` | 恢复使用服务器 DNS |
 | `xray version` | 查看脚本和核心版本 |
-| `xray update core` | 安装兼容清单中的核心版本 |
+| `xray update core` | 更新到 Xray 官方最新正式版 |
+| `xray update core --check` | 仅检查最新核心、新字段、现有配置及管理 API，不替换核心 |
 | `xray update sh`／`xray U` | 更新管理脚本到最新正式版 |
 | `xray update dat` | 更新规则数据 |
 | `xray uninstall` | 卸载受管程序和服务，保留配置备份、证书与凭据 |
@@ -254,8 +255,12 @@ xray update sh
 xray U
 ```
 
-需要指定版本时，仍可执行 `xray update sh v0.1.6`。可在 [Releases](https://github.com/tktkl/Xray/releases) 查看已发布版本。脚本更新保留已有节点，不重启 Xray 核心。
+需要指定版本时，仍可执行 `xray update sh v0.1.7`。可在 [Releases](https://github.com/tktkl/Xray/releases) 查看已发布版本。脚本更新保留已有节点，不重启 Xray 核心。
 
-已安装 v0.1.5 或更早版本的用户，先执行一次 `xray update sh v0.1.6`，以后直接使用 `xray update sh` 即可。
+已安装 v0.1.5 或更早版本的用户，先执行一次 `xray update sh v0.1.7`，以后直接使用 `xray update sh` 即可。
+
+更新核心时先运行 `xray update sh` 获取最新脚本，再运行 `xray update core`；不需要填写核心版本，也不要求新版已加入脚本清单。脚本校验官方 SHA256，并在替换前验证现有配置和节点增删、路由替换等 API；失败保留旧核心，替换后启动失败则回滚。已是最新版时不重复重启，原本停止的服务保持停止。
+
+发现相对脚本基线新增的 JSON 字段时，会显示字段名称及完整报告路径。新增字段不会自动写入已有节点；菜单和分享链接支持需要脚本另行适配。字段结构比较不涵盖默认值、枚举或行为变化，更新时同时提供官方发行说明链接。可以先执行 `xray update core --check`，也可通过 `xray update core v26.11.9` 指定版本。
 
 完整参数见 `xray help`；更多资料：[命令兼容表](docs/COMPATIBILITY.md) · [协议与出口能力](docs/PROTOCOLS.md) · [开发与测试](docs/DEVELOPMENT.md)。

@@ -34,6 +34,7 @@ help_text() {
       log [debug|info|warning|error|none|del]；logerr
       u, update [core|sh|dat|nginx|certbot] [版本]；U, update.sh [版本]
       update sh [版本]               默认更新最新正式版；也可指定 Release
+      update core [版本] [--check]   默认更新官方最新核心；--check 仅检查新字段及兼容性
       install；reinstall；un, uninstall；bbr
 
 工具：v, version；ip；get-port；ss2022 [加密方式]；pbk
@@ -466,6 +467,22 @@ menu_update_script() {
         menu_run "$@"; return
     done
 }
+menu_update_core() {
+    local choice version result
+    while :; do
+        choice=$(menu_select '选择核心更新方式' latest latest '更新官方最新正式版（影响所有节点）' \
+            check '仅检查最新核心、新字段及兼容性' version '指定已发布核心版本') || return
+        set -- update core
+        case $choice in
+            check) set -- "$@" --check;;
+            version)
+                if version=$(prompt_step '已发布的核心版本（例如 v26.11.9）'); then :
+                else result=$?; [[ $result == 125 ]] && continue; return "$result"; fi
+                set -- "$@" "$version";;
+        esac
+        menu_run "$@"; return
+    done
+}
 menu_update() {
     local choice result
     while :; do
@@ -473,6 +490,10 @@ menu_update() {
             nginx 'Nginx' certbot 'Certbot') || return
         if [[ $choice == sh ]]; then
             if menu_update_script; then return
+            else result=$?; [[ $result == 125 ]] && continue; return "$result"; fi
+        fi
+        if [[ $choice == core ]]; then
+            if menu_update_core; then return
             else result=$?; [[ $result == 125 ]] && continue; return "$result"; fi
         fi
         menu_run update "$choice"; return
@@ -573,7 +594,7 @@ main() {
             target=${1:-core}; value=${2:-}
             [[ $command != U && $command != update.sh ]] || { target='sh'; value=${1:-}; }
             case $target in
-                core) update_core "${value:-v26.11.9}";;
+                core) update_core "${@:2}";;
                 sh)
                     if [[ $command == U || $command == update.sh ]]; then update_manager "$@"
                     else update_manager "${@:2}"; fi;;

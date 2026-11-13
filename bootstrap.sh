@@ -2,7 +2,7 @@
 # Standalone installer: this file can be copied to a server without the repository.
 set -Eeuo pipefail
 umask 077
-DEFAULT_VERSION='v0.1.6'
+DEFAULT_VERSION='v0.1.7'
 REPOSITORY='tktkl/Xray'
 WORK=''
 
@@ -11,7 +11,7 @@ usage() {
     cat <<'EOF'
 Xray 一键安装入口（公开仓库，无需 GitHub Token）
 用法：sudo bash bootstrap.sh [选项]
-  --version v0.1.6             安装指定 Release（默认与入口脚本版本一致）
+  --version v0.1.7             安装指定 Release（默认与入口脚本版本一致）
   --sha256 SHA256             使用另外核实的程序包摘要
   --offline-cache DIR         使用本地核心/规则数据缓存
   -h, --help                  显示帮助

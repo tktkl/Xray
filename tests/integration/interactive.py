@@ -185,6 +185,10 @@ with Terminal(BIN) as terminal:
     terminal.choose("选择脚本更新方式", "2")
     terminal.answer("已发布的脚本版本", "0")
     terminal.choose("选择脚本更新方式", "0")
+    terminal.choose("选择更新组件", "1")
+    terminal.choose("选择核心更新方式", "3")
+    terminal.answer("已发布的核心版本", "0")
+    terminal.choose("选择核心更新方式", "0")
     terminal.choose("选择更新组件", "0")
 
     terminal.choose("Xray 管理菜单", "10")
@@ -380,6 +384,22 @@ with Terminal(BIN) as terminal:
     terminal.choose("选择更新组件", "2")
     terminal.choose("选择脚本更新方式", "1")
     terminal.expect("已是最新正式版")
+    terminal.choose("Xray 管理菜单", "0")
+    terminal.finish()
+assert (ROOT / "current").resolve() == before
+
+curl_fixture.write_bytes(Path("/src/tests/fixtures/core-curl").read_bytes())
+with Terminal(BIN, "update", "core") as terminal:
+    terminal.expect("已是官方最新正式版")
+    terminal.finish()
+with Terminal(BIN, "update", "core", "--check") as terminal:
+    terminal.expect("现有配置及管理 API 检查通过")
+    terminal.finish()
+with Terminal(BIN) as terminal:
+    terminal.choose("Xray 管理菜单", "13")
+    terminal.choose("选择更新组件", "1")
+    terminal.choose("选择核心更新方式", "2")
+    terminal.expect("现有配置及管理 API 检查通过")
     terminal.choose("Xray 管理菜单", "0")
     terminal.finish()
 assert (ROOT / "current").resolve() == before

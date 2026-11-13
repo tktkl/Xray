@@ -14,7 +14,7 @@ setup_manager() {
     export PATH="$XRAY_MANAGER_ROOT/test-bin:$PATH"
     source /src/lib/common.sh
     MANAGER_HOME=/src
-    for module in store uri protocol render nginx runtime cert install commands; do source "/src/lib/$module.sh"; done
+    for module in store uri protocol render nginx runtime cert core-update install commands; do source "/src/lib/$module.sh"; done
     mkdir -p "$ROOT/logs"
     chown xray-manager:xray-manager "$ROOT/logs"
     mkdir -p "$ROOT/runtime"

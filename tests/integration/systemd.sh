@@ -37,6 +37,48 @@ xray log error
 systemctl is-active --quiet xray-manager.service
 DOWNLOAD_CACHE=/src/.cache xray update core v26.11.9
 systemctl is-active --quiet xray-manager.service
+# Exercise latest/check-only, an older-version fixture, stopped updates and rollback.
+core_fixture=$(mktemp -d /var/tmp/xray-core-update.XXXXXX)
+mkdir "$core_fixture/bin" "$core_fixture/fault-bin"
+cp tests/fixtures/core-curl "$core_fixture/bin/curl"
+cp tests/fixtures/core-systemctl "$core_fixture/fault-bin/systemctl"
+chmod 755 "$core_fixture/bin/curl" "$core_fixture/fault-bin/systemctl"
+core_pid=$(systemctl show xray-manager.service --property=MainPID --value)
+core_nodes=$(sha256sum /var/lib/xray-manager/current/nodes/*.json)
+core_generation=$(readlink -f /var/lib/xray-manager/current)
+PATH="$core_fixture/bin:$PATH" xray update core
+PATH="$core_fixture/bin:$PATH" DOWNLOAD_CACHE=/src/.cache xray update core --check
+[[ $(systemctl show xray-manager.service --property=MainPID --value) == "$core_pid" ]]
+core_bin=/usr/local/lib/xray-manager/core/xray
+cp "$core_bin" "$core_fixture/previous"
+# Only the fixture version string differs; API/data-plane calls use the real core.
+printf '#!/usr/bin/env bash\nif [[ ${1:-} == version ]]; then printf "Xray 0.0.0\\n"; exit; fi\nexec "%s" "$@"\n' "$core_fixture/previous" > "$core_fixture/older"
+chmod 755 "$core_fixture/previous" "$core_fixture/older"
+chmod 755 "$core_fixture"
+install -m 755 "$core_fixture/older" "$core_bin.next"
+mv -f "$core_bin.next" "$core_bin"
+PATH="$core_fixture/bin:$PATH" DOWNLOAD_CACHE=/src/.cache xray update core
+[[ $(xray version | sed -n '2p') == Xray\ 26.11.9\ * ]]
+[[ $(systemctl show xray-manager.service --property=MainPID --value) != "$core_pid" ]]
+core_digest=$(sha256sum "$core_bin")
+systemctl stop xray-manager.service
+PATH="$core_fixture/bin:$PATH" DOWNLOAD_CACHE=/src/.cache xray update core v26.11.9
+! systemctl is-active --quiet xray-manager.service
+systemctl start xray-manager.service
+if PATH="$core_fixture/fault-bin:$PATH" CORE_FAIL_MARKER="$core_fixture/start-failed" \
+    DOWNLOAD_CACHE=/src/.cache xray update core v26.11.9; then exit 1; fi
+systemctl is-active --quiet xray-manager.service
+[[ $(sha256sum "$core_bin") == "$core_digest" && ! -e /var/lib/xray-manager/core-upgrade.json ]]
+if PATH="$core_fixture/fault-bin:$PATH" CORE_FAIL_MARKER="$core_fixture/rollback-failed" CORE_FAIL_ROLLBACK=1 \
+    DOWNLOAD_CACHE=/src/.cache xray update core v26.11.9; then exit 1; fi
+[[ -f /var/lib/xray-manager/core-upgrade.json ]]
+xray recover
+systemctl is-active --quiet xray-manager.service
+[[ ! -e /var/lib/xray-manager/core-upgrade.json ]]
+[[ $(sha256sum /var/lib/xray-manager/current/nodes/*.json) == "$core_nodes" ]]
+[[ $(readlink -f /var/lib/xray-manager/current) == "$core_generation" ]]
+rm -rf "$core_fixture"
+printf 'PASS: latest core update, real API preflight, stopped-state preservation and failed rollback recovery\n'
 DOWNLOAD_CACHE=/src/.cache xray update dat
 systemctl is-active --quiet xray-manager.service
 if [[ -n $release_fixture ]]; then

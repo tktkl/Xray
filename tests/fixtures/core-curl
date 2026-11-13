@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Only official core release URLs are supported by this offline fixture.
+set -Eeuo pipefail
+output='' url='' write_out=''
+while (($#)); do
+    case $1 in
+        --output|-o) output=$2; shift 2;;
+        --write-out) write_out=$2; shift 2;;
+        https://github.com/*) url=$1; shift;;
+        *) shift;;
+    esac
+done
+[[ -z ${CORE_RELEASE_REQUESTS:-} ]] || printf '%s\n' "$url" >> "$CORE_RELEASE_REQUESTS"
+version=${CORE_RELEASE_VERSION:-v26.11.9}
+fixture=${CORE_RELEASE_FIXTURE:-/nonexistent}
+case $url in
+    https://github.com/XTLS/Xray-core/releases/latest)
+        [[ ${CORE_HTTP_FAIL:-} != latest && ${CORE_HTTP_FAIL:-} != all ]] || exit 22
+        [[ $write_out == '%{url_effective}' && $output == /dev/null ]] || exit 3
+        printf '%s' "${CORE_LATEST_URL-https://github.com/XTLS/Xray-core/releases/tag/$version}";;
+    "https://github.com/XTLS/Xray-core/releases/download/$version/"*.zip.dgst)
+        [[ ${CORE_HTTP_FAIL:-} != digest && ${CORE_HTTP_FAIL:-} != all ]] || exit 22
+        asset=${url##*/}; asset=${asset%.dgst}
+        if [[ -f $fixture/$asset.dgst ]]; then cp "$fixture/$asset.dgst" "$output"
+        else printf 'SHA2-256= %s\n' "$(sha256sum "/src/.cache/$asset" | awk '{print $1}')" > "$output"; fi;;
+    "https://github.com/XTLS/Xray-core/releases/download/$version/"*.zip)
+        [[ ${CORE_HTTP_FAIL:-} != binary && ${CORE_HTTP_FAIL:-} != all ]] || exit 22
+        asset=${url##*/}
+        if [[ -f $fixture/$asset ]]; then cp "$fixture/$asset" "$output"
+        else cp "/src/.cache/$asset" "$output"; fi;;
+    "https://github.com/XTLS/Xray-core/archive/refs/tags/$version.tar.gz")
+        [[ ${CORE_HTTP_FAIL:-} != source && ${CORE_HTTP_FAIL:-} != all ]] || exit 22
+        cp "$fixture/source.tar.gz" "$output";;
+    *) exit 22;;
+esac

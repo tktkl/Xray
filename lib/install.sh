@@ -7,22 +7,13 @@ download_verified() {
         printf '%s  %s\n' "$digest" "$output" | sha256sum -c - >/dev/null || { rm -f "$output"; die '离线缓存摘要不匹配。'; return; }
         return
     fi
-    curl --fail --silent --show-error --location --retry 3 --connect-timeout 15 --max-time 300 --proto '=https' --tlsv1.2 "$url" -o "$output" || return
+    curl --fail --silent --show-error --location --retry 3 --connect-timeout 15 --max-time 300 --proto '=https' --proto-redir '=https' --tlsv1.2 "$url" --output "$output" || return
     printf '%s  %s\n' "$digest" "$output" | sha256sum -c - >/dev/null || { rm -f "$output"; die '下载内容 SHA256 校验失败。'; return; }
 }
 download_core() {
-    local version=${1:-v26.11.9} dest=$2 arch asset sha tmp
-    case $(uname -m) in x86_64) arch=amd64;; aarch64|arm64) arch=arm64;; *) die '只支持 amd64/arm64。'; return 1;; esac
-    asset=$(jq -r --arg v "$version" --arg a "$arch" '.core[$v][$a].asset // empty' "$MANAGER_HOME/config/releases.json")
-    sha=$(jq -r --arg v "$version" --arg a "$arch" '.core[$v][$a].sha256 // empty' "$MANAGER_HOME/config/releases.json")
-    [[ -n $asset ]] || { die '该核心版本不在已验证兼容清单中。'; return; }
-    tmp=$(mktemp -d)
-    if ! download_verified "https://github.com/XTLS/Xray-core/releases/download/$version/$asset" "$tmp/core.zip" "$sha"; then rm -rf "$tmp"; return 1; fi
-    unzip -q "$tmp/core.zip" -d "$tmp/unpacked" || { rm -rf "$tmp"; return 1; }
-    mkdir -p "$dest"
-    chmod 755 "$dest"
-    install -m 755 "$tmp/unpacked/xray" "$dest/xray"
-    rm -rf "$tmp"
+    local info
+    info=$(core_release_info "$1") || return
+    core_fetch_binary "$info" "$2"
 }
 download_data() {
     local dest=$1 version name sha tmp
@@ -65,7 +56,7 @@ ensure_component() {
 }
 install_manager() {
     require_root
-    local target=/usr/local/lib/xray-manager source_home=$MANAGER_HOME os_id os_version stage
+    local target=/usr/local/lib/xray-manager source_home=$MANAGER_HOME os_id os_version stage default_core
     if (($#)); then
         [[ $# == 2 && $1 == --offline-cache && -d $2 ]] || { die '用法：install.sh [--offline-cache DIR]'; return; }
         DOWNLOAD_CACHE=$(readlink -f "$2")
@@ -90,7 +81,8 @@ install_manager() {
     cp "$source_home/bootstrap.sh" "$stage/bootstrap.sh"
     chmod 755 "$stage/bin/xray"
     MANAGER_HOME=$stage
-    if ! download_core v26.11.9 "$stage/core" || ! download_data "$stage/core"; then
+    default_core=$(jq -er .default_core "$stage/config/releases.json") || return
+    if ! download_core "$default_core" "$stage/core" || ! download_data "$stage/core"; then
         MANAGER_HOME=$source_home; rm -rf "$stage"; return 1
     fi
     mkdir -p "$target/releases" "$target/core"
@@ -140,37 +132,60 @@ update_data() {
     rm -rf "$tmp"
 }
 update_core() {
-    local version=${1:-v26.11.9} tmp running=false
-    note '核心更新是全局操作，将重新启动所有节点。'
+    local version=latest tmp running=false info current check=false latest=false
+    if (($#)) && [[ $1 != -* ]]; then version=$1; shift; fi
+    while (($#)); do
+        case $1 in --check) check=true; shift;; *) die '用法：xray update core [版本|latest] [--check]'; return;; esac
+    done
+    if [[ $version == latest ]]; then latest=true; version=$(latest_core_version) || return; fi
+    info=$(core_release_info "$version") || return
+    core_field_report "$info" || return
+    current=$(core_version "$CORE") || return
+    if [[ $latest == true && $current == "$version" && $check == false ]]; then
+        note "核心已是官方最新正式版 $version，无需重启。"; return
+    fi
     tmp=$(mktemp -d "$ROOT/core-update.XXXXXX")
     chown "root:$SERVICE_USER" "$tmp"; chmod 750 "$tmp"
-    download_core "$version" "$tmp" || { rm -rf "$tmp"; return 1; }
-    "$tmp/xray" api help 2>&1 | grep 'adrules' >/dev/null || { rm -rf "$tmp"; die '候选核心缺少路由 API。'; return; }
-    as_service "$tmp/xray" run -test -c "$ROOT/current/config.json" >/dev/null || { rm -rf "$tmp"; return 1; }
-    systemctl start xray-manager-recover.service || return
-    write_begin || return
+    core_fetch_binary "$info" "$tmp" || { rm -rf "$tmp"; return 1; }
+    if [[ $(as_service "$tmp/xray" version | awk '$1=="Xray" && !seen {print "v"$2; seen=1}') != "$version" ]]; then
+        rm -rf "$tmp"; die '候选核心实际版本与发布标签不一致。'; return
+    fi
+    if ! as_service "$tmp/xray" run -test -c "$ROOT/current/config.json" > "$ROOT/core-update-error.log" 2>&1 ||
+       ! core_api_probe "$tmp/xray" "$tmp/probe" >> "$ROOT/core-update-error.log" 2>&1; then
+        rm -rf "$tmp"; die "候选核心配置或 API 验证失败；现有核心未改变。诊断：$ROOT/core-update-error.log"; return
+    fi
+    if [[ $check == true ]]; then
+        rm -rf "$tmp"; note "核心 $version 的现有配置及管理 API 检查通过，未替换核心。"; return
+    fi
+    note "核心更新 $current → $version 是全局操作，将重新启动所有正在运行的节点。"
+    systemctl start xray-manager-recover.service || { rm -rf "$tmp"; return 1; }
+    write_begin || { unlock_state; rm -rf "$tmp"; return 1; }
+    # Nodes may have changed while downloading; validate the committed configuration again under lock.
+    as_service "$tmp/xray" run -test -c "$ROOT/current/config.json" > "$ROOT/core-update-error.log" 2>&1 || {
+        unlock_state; rm -rf "$tmp"; die "当前配置已变化且无法通过候选核心验证。诊断：$ROOT/core-update-error.log"; return;
+    }
     service_active xray-manager.service && running=true
     mkdir -p "$ROOT/core-backups"
-    install -m 755 "$CORE" "$ROOT/core-backups/previous"
-    sync_path "$ROOT/core-backups/previous"
-    jq -n --arg previous "$ROOT/core-backups/previous" --argjson running "$running" '{previous:$previous,was_running:$running}' | atomic_file "$ROOT/core-upgrade.json"
-    [[ $running == false ]] || systemctl stop xray-manager.service
-    cp "$CORE" "$tmp/previous"
-    install -m 755 "$tmp/xray" "${CORE}.next"
-    mv -f "${CORE}.next" "$CORE"
-    if [[ $running == true ]]; then
-        if ! systemctl start xray-manager.service || ! wait_api; then
-            install -m 755 "$tmp/previous" "$CORE"
-            systemctl restart xray-manager.service
-            rm -f "$ROOT/core-upgrade.json"
-            unlock_state
-            rm -rf "$tmp"; die '核心升级失败，已恢复旧核心。'; return
-        fi
+    install -m 755 "$CORE" "$ROOT/core-backups/previous" && sync_path "$ROOT/core-backups/previous" || {
+        unlock_state; rm -rf "$tmp"; return 1;
+    }
+    jq -n --arg previous "$ROOT/core-backups/previous" --argjson running "$running" \
+        '{previous:$previous,was_running:$running}' | atomic_file "$ROOT/core-upgrade.json" || {
+        unlock_state; rm -rf "$tmp"; return 1;
+    }
+    if { [[ $running == true ]] && ! systemctl stop xray-manager.service; } ||
+       ! install -m 755 "$tmp/xray" "${CORE}.next" || ! sync_path "${CORE}.next" ||
+       ! mv -f "${CORE}.next" "$CORE" || ! sync_path "$(dirname -- "$CORE")" ||
+       { [[ $running == true ]] && { ! systemctl start xray-manager.service || ! wait_api || ! core_runtime_matches; }; }; then
+        if recover_state; then note '核心升级失败，已恢复旧核心。'
+        else note "核心升级及恢复失败；恢复记录保留在 $ROOT/core-upgrade.json。"; fi
+        unlock_state; rm -rf "$tmp"; return 1
     fi
     rm -f "$ROOT/core-upgrade.json"
     sync_path "$ROOT"
     unlock_state
     rm -rf "$tmp"
+    note "核心已更新至 $version。"
 }
 wait_api() {
     local i

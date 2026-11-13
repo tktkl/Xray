@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Inject only core startup/rollback failures in a disposable systemd container.
+set -Eeuo pipefail
+if [[ -f ${XRAY_MANAGER_ROOT:-/var/lib/xray-manager}/core-upgrade.json ]]; then
+    if [[ ${1:-} == start && ${2:-} == xray-manager.service && ! -e ${CORE_FAIL_MARKER:?} ]]; then
+        touch "$CORE_FAIL_MARKER"
+        exit 1
+    fi
+    if [[ ${1:-} == restart && ${2:-} == xray-manager.service && ${CORE_FAIL_ROLLBACK:-0} == 1 ]]; then exit 1; fi
+fi
+exec /usr/bin/systemctl "$@"

@@ -27,7 +27,7 @@ amd64 主机将 `arm64` 换成 `amd64`。缓存只涵盖核心与规则文件，
 独立引导器只下载固定标签的公开 Release，无需 GitHub Token：
 
 ```bash
-sudo bash bootstrap.sh --version v0.1.6
+sudo bash bootstrap.sh --version v0.1.7
 ```
 
 未发布版本、网络失败、摘要异常或包路径不安全时停止，不回退到分支源码。可以通过 `--sha256` 指定另行核实的程序包摘要。摘要校验用于完整性检查，不能证明代码没有后门。
@@ -58,18 +58,30 @@ amd64 主机将下载参数改为 `amd64`。默认镜像基于 Ubuntu 24.04，�
 发布标签必须与 `lib/common.sh` 中的版本一致。本地打包：
 
 ```bash
-bash scripts/package-release.sh v0.1.6
+bash scripts/package-release.sh v0.1.7
 ```
 
 默认在 `dist/` 生成：
 
-- `xray-manager-v0.1.6.tar.gz`：程序源码包。
+- `xray-manager-v0.1.7.tar.gz`：程序源码包。
 - `install.sh`：独立安装入口。
 - `SHA256SUMS`：两个附件的 SHA256。
 
 [发布工作流](../.github/workflows/release.yml) 在版本标签对应的完整 CI 全部成功后上传这些附件。不要修改已发布标签或覆盖现有附件；代码更新使用新版本。
 
 ## 实现约定
+
+核心更新默认解析 XTLS 官方最新正式版。清单内版本使用受版本控制的摘要，清单外版本使用对应架构官方 `.dgst` 的 SHA2-256；不自动升级系统服务，也不设置客户端版本上下限。候选核心在非 root 用户下通过现有配置和隔离 Unix socket 的真实增删入口/出口、替换及查询路由测试后，才进入全局替换事务。
+
+`config/core-fields.json` 保存字段基线。运行时只读取官方固定标签源码的 `infra/conf` Go JSON 标签声明，不编译、不执行源码；比较新增/移除声明并写入 `/var/lib/xray-manager/core-reports/版本.json`。此检查不覆盖无显式 JSON 标签的动态结构、枚举、默认值或行为变化，后者需人工阅读发行说明并测试。字段声明移动也可能表现为新增和移除；不据此自动更改节点。
+
+确认新版本的适配与回归后，可从已核对标签的 Xray 源码生成下一份基线：
+
+```bash
+bash scripts/update-core-fields.sh /path/to/Xray-core v26.11.9 > config/core-fields.json
+```
+
+基线不应在服务器升级时自动覆盖，否则会掩盖脚本尚未适配的字段。初始安装继续使用 `config/releases.json` 的 `default_core`；后续 `xray update core` 不受该值或已测试版本列表限制。
 
 - Bash＋jq 模块独立实现，参考 233boy/Xray v1.37 的命令习惯，不加载或执行上游脚本。兼容范围见 [命令兼容表](COMPATIBILITY.md)。
 - 一个核心进程管理多个独立节点。节点源配置、完整运行配置、Nginx 站点及证书版本引用按版本保存，`current` 指向最后提交版本。
@@ -82,4 +94,4 @@ bash scripts/package-release.sh v0.1.6
 - Certbot 使用 Cloudflare DNS-01、60 秒传播等待、ECDSA 单域名证书和系统 `certbot.timer`。签发与部署分离：签发钩子只排队，部署失败由部署任务每五分钟重试，不重新申请证书。
 - 安装仅按需添加 Nginx／Certbot，不自动开启 BBR 或修改防火墙。卸载仅移除受管程序、服务和站点入口，保留恢复资料、证书、凭据及共享软件包。
 
-配置示例见 [examples](../examples/)，固定下载版本和 SHA256 见 [config/releases.json](../config/releases.json)。
+配置示例见 [examples](../examples/)，初始安装及规则数据的固定版本和 SHA256 见 [config/releases.json](../config/releases.json)。
