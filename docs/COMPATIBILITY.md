@@ -22,7 +22,7 @@
 | dp/dynamicport | 与上游当前行为一致，明确不支持 |
 | bbr | 仅明确调用时配置 |
 
-更新脚本需指定发布标签，例如 `xray update sh v0.1.1`；从公开 Release 下载并校验摘要，无需 GitHub Token。创建 Release 之前不会假装存在更新包。Cloudflare Token 仍只用于 DNS-01 签发，与程序下载安装无关。
+更新脚本需指定发布标签，例如 `xray update sh v0.1.2`；从公开 Release 下载并校验摘要，无需 GitHub Token。创建 Release 之前不会假装存在更新包。Cloudflare Token 仍只用于 DNS-01 签发，与程序下载安装无关。
 
 名字精确匹配优先，多个匹配时交互选择；非交互必须提供明确 ID。快捷修改命令同样可通过 `xray c n001 OPTION VALUE` 使用。
 

@@ -306,9 +306,11 @@ command_dns() {
 }
 command_log() {
     local target=$1 value=${2:-}
-    if [[ -z $value ]]; then tail -F "$ROOT/logs/$([[ $target == log ]] && echo access || echo error).log"; return; fi
+    # Log entries live in a service-writable directory. Never follow them as root.
+    if [[ -z $value ]]; then as_service tail -F -- "$ROOT/logs/$([[ $target == log ]] && echo access || echo error).log"; return; fi
     if [[ $value == del ]]; then
-        : > "$ROOT/logs/access.log"; : > "$ROOT/logs/error.log"; return
+        as_service truncate -s 0 -- "$ROOT/logs/access.log" "$ROOT/logs/error.log"
+        return
     fi
     [[ $value =~ ^(debug|info|warning|error|none)$ ]] || { die '无效日志级别。'; return; }
     note '日志设置是全局操作。'

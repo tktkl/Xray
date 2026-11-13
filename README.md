@@ -12,7 +12,7 @@
 
 ```bash
 apt-get update && apt-get install -y curl ca-certificates
-curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://github.com/tktkl/Xray/releases/download/v0.1.1/install.sh && bash xray-install.sh
+curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://github.com/tktkl/Xray/releases/download/v0.1.2/install.sh && bash xray-install.sh
 ```
 
 安装后直接运行 `xray`。
@@ -21,7 +21,7 @@ curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://gith
 
 ```bash
 sudo apt-get update && sudo apt-get install -y curl ca-certificates
-curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://github.com/tktkl/Xray/releases/download/v0.1.1/install.sh && sudo bash xray-install.sh
+curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://github.com/tktkl/Xray/releases/download/v0.1.2/install.sh && sudo bash xray-install.sh
 ```
 
 安装后运行 `sudo xray`。普通用户没有 sudo 权限时，先执行 `su -` 切换到 root，再按 root 用户的步骤安装；安装和管理均需要 root 权限。
@@ -246,11 +246,11 @@ xray cert delete node.example.com
 更新脚本需要指定已发布的版本标签，例如：
 
 ```bash
-xray update sh v0.1.1
+xray update sh v0.1.2
 ```
 
-`v0.1.1` 是当前版本示例，有新版时换成对应标签。可在 [Releases](https://github.com/tktkl/Xray/releases) 查看已发布版本。
+`v0.1.2` 是当前版本示例，有新版时换成对应标签。可在 [Releases](https://github.com/tktkl/Xray/releases) 查看已发布版本。
 
-已安装 v0.1.0 的用户执行上面的更新命令后，重新运行 `xray` 即可使用编号菜单，已有节点会保留。
+已安装旧版的用户执行上面的更新命令后，重新运行 `xray` 即可使用编号菜单，已有节点会保留。
 
 完整参数见 `xray help`；更多资料：[命令兼容表](docs/COMPATIBILITY.md) · [协议与出口能力](docs/PROTOCOLS.md) · [开发与测试](docs/DEVELOPMENT.md)。

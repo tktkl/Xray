@@ -96,6 +96,27 @@ teardown() { teardown_manager; }
     result=$(json_redact <<<'{"id":"n001","pass":"secret","password":"secret","username":"account","private_key":"key","short_id":"ab","seed":"seed","nested":{"auth":"auth"}}')
     [[ $result != *secret* && $result != *account* && $result != *'"ab"'* ]]
 }
+@test "Log operations cannot follow service-owned symlinks into root-only files" {
+    chmod 750 "$ROOT"
+    chgrp "$SERVICE_USER" "$ROOT"
+    printf 'access event\n' > "$ROOT/logs/access.log"
+    printf 'error event\n' > "$ROOT/logs/error.log"
+    chown "$SERVICE_USER:$SERVICE_USER" "$ROOT/logs/"*.log
+    run command_log log del
+    assert_status 0
+    [[ ! -s $ROOT/logs/access.log && ! -s $ROOT/logs/error.log ]]
+
+    mkdir "$ROOT/root-private"
+    chmod 700 "$ROOT/root-private"
+    printf 'ROOT_ONLY_AUDIT_CANARY\n' > "$ROOT/root-private/protected"
+    chmod 600 "$ROOT/root-private/protected"
+    runuser -u "$SERVICE_USER" -- ln -sf "$ROOT/root-private/protected" "$ROOT/logs/access.log"
+    run command_log log del
+    [[ $status != 0 ]]
+    [[ $(cat "$ROOT/root-private/protected") == ROOT_ONLY_AUDIT_CANARY ]]
+    run timeout 1 /src/bin/xray log
+    [[ $status == 124 && $output != *ROOT_ONLY_AUDIT_CANARY* ]]
+}
 @test "Common Trojan links imply TLS and VMess round trip preserves transport" {
     run outbound_from_uri 'trojan://p%40ss@example.test:443?sni=example.test'
     assert_status 0
