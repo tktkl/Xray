@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-VERSION=0.1.3
+VERSION=0.1.4
 MANAGER_ENTRYPOINT=${XRAY_MANAGER_ENTRYPOINT:-/usr/local/lib/xray-manager/bin/xray}
 ROOT=${XRAY_MANAGER_ROOT:-/var/lib/xray-manager}
 CORE=${XRAY_CORE_BIN:-/usr/local/lib/xray-manager/core/xray}

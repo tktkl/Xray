@@ -51,6 +51,38 @@ teardown() { teardown_manager; }
     [[ $(jq -r .sni <<< "$NODE") =~ ^(apps.mzstatic.com|xp.apple.com)$ ]]
     [[ $(jq -r .credentials.short_id <<< "$NODE") =~ ^[a-f0-9]{16}$ ]]
     [[ $(jq -r .credentials.private_key <<< "$NODE") != '' ]]
+    NODE=$(jq '.id="n001"|.name="one"' <<< "$NODE")
+    STATE=$(jq --argjson n "$NODE" '.nodes=[$n]' <<< "$STATE")
+    new_generation
+    jq -e 'all(.inbounds[].streamSettings.realitySettings; (has("minClientVer")|not) and (has("maxClientVer")|not))' "$CANDIDATE/config.json" >/dev/null
+    result=$(client_json "$NODE")
+    [[ $(jq -r .streamSettings.realitySettings.publicKey <<< "$result") == "$(jq -r .credentials.public_key <<< "$NODE")" ]]
+}
+@test "mKCP uses finalmask for new nodes, preserves old native nodes and exports the actual seed" {
+    local node client current legacy link
+    build_node kcp '{}' 23456 --address 127.0.0.1
+    node=$(jq '.id="n001"|.name="one"' <<< "$NODE")
+    current=$(client_json "$node")
+    jq -e '.streamSettings|(.finalmask.udp[0].type=="mkcp-legacy") and (.kcpSettings|has("seed")|not)' <<< "$current" >/dev/null
+    legacy=$(client_json "$node" legacy)
+    jq -e '.streamSettings|(.kcpSettings.seed|length)>0 and (has("finalmask")|not)' <<< "$legacy" >/dev/null
+    link=$(share_uri "$node"); client=$(base64_decode "${link#vmess://}")
+    [[ $(jq -r .path <<< "$client") == "$(jq -r .credentials.seed <<< "$node")" ]]
+
+    node=$(jq 'del(.kcp_compat)' <<< "$node")
+    current=$(client_json "$node")
+    jq -e '.streamSettings|has("finalmask")|not' <<< "$current" >/dev/null
+    run client_json "$node" legacy
+    [[ $status != 0 ]]
+}
+@test "Legacy client export changes JSON layout without installing a version restriction" {
+    build_node vws '{}' example.test auto /ws --address 127.0.0.1
+    current=$(client_json "$NODE")
+    legacy=$(client_json "$NODE" legacy)
+    [[ $(jq -r .streamSettings.wsSettings.host <<< "$current") == example.test ]]
+    [[ $(jq -r .streamSettings.wsSettings.headers.Host <<< "$legacy") == example.test ]]
+    run client_json "$NODE" invalid-profile
+    [[ $status != 0 ]]
 }
 @test "Single-domain nginx output contains independent nodes and public ports" {
     local a b

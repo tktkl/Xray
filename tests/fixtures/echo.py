@@ -8,6 +8,9 @@ import time
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
+        payload = self.client_address[0].encode()
+        if self.path != '/stream':
+            self.send_header('Content-Length', str(len(payload)))
         self.end_headers()
         if self.path == '/stream':
             try:
@@ -20,7 +23,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 pass
         else:
-            self.wfile.write(self.client_address[0].encode())
+            self.wfile.write(payload)
     def log_message(self, *args):
         pass
 

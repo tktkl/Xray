@@ -174,6 +174,11 @@ with Terminal(BIN) as terminal:
     terminal.choose("选择节点", "0")
     terminal.choose("选择导出方式", "0")
 
+    terminal.choose("Xray 管理菜单", "8")
+    terminal.choose("选择导出方式", "4")
+    terminal.choose("选择节点", "0")
+    terminal.choose("选择导出方式", "0")
+
     terminal.choose("Xray 管理菜单", "13")
     terminal.choose("选择更新组件", "2")
     terminal.answer("已发布的脚本版本", "0")
@@ -256,6 +261,7 @@ with Terminal(BIN, "c", "n002") as terminal:
     terminal.choose("选择 Shadowsocks 加密方式", "4")
     terminal.finish()
 assert node("n002")["credentials"]["method"] == "aes-128-gcm"
+assert json.loads(run("client", "n001", "legacy").stdout)["outbounds"][0]["streamSettings"]["realitySettings"]["publicKey"]
 
 with Terminal(BIN, "sni", "n001") as terminal:
     terminal.choose("选择 REALITY SNI", "3")

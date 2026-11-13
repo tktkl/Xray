@@ -1,0 +1,14 @@
+{
+  "v1.8.4": {
+    "amd64": {"asset":"Xray-linux-64.zip","sha256":"2a855f610008a598b88424435aefaee1df2c1b0fa1296d4f8f60080b528c9971"},
+    "arm64": {"asset":"Xray-linux-arm64-v8a.zip","sha256":"be6b28548551d9fd357b147f74b163dfc14408e7f75cbf4ba788995dabc33d75"}
+  },
+  "v1.8.24": {
+    "amd64": {"asset":"Xray-linux-64.zip","sha256":"47a860787e823474a358d6bca536547df6dd08b69c6de482ea92a9e7e8f8969c"},
+    "arm64": {"asset":"Xray-linux-arm64-v8a.zip","sha256":"82939febc98c2738dd78e931a69967f9c16b771bd20f313bfc0629bacd13bab6"}
+  },
+  "v24.12.31": {
+    "amd64": {"asset":"Xray-linux-64.zip","sha256":"445353d406081585a5e2958ed05372e3bf90ec6e4301d5ae7177231bb554077f"},
+    "arm64": {"asset":"Xray-linux-arm64-v8a.zip","sha256":"746333b1bf9ad8b860fe77d9f5ba94588449923519de38947eaca4112527f7b8"}
+  }
+}

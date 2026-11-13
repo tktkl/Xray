@@ -67,8 +67,8 @@ canonical_protocol() {
 }
 select_protocol() {
     menu_select '选择协议' reality \
-        reality 'VLESS-REALITY（无需自有域名）' \
-        ss 'Shadowsocks／SS2022' \
+        reality 'VLESS-REALITY（无需自有域名，需兼容当前 REALITY 握手）' \
+        ss 'Shadowsocks／SS2022（旧客户端可选传统 AEAD）' \
         tcp 'VMess TCP' kcp 'VMess mKCP' \
         ws 'VMess WS＋TLS（需要域名）' grpc 'VMess gRPC＋TLS（需要域名）' \
         vws 'VLESS WS＋TLS（需要域名）' vgrpc 'VLESS gRPC＋TLS（需要域名）' \
@@ -81,8 +81,8 @@ select_ss_method() {
         2022-blake3-aes-128-gcm 'SS2022 AES-128-GCM' \
         2022-blake3-aes-256-gcm 'SS2022 AES-256-GCM' \
         2022-blake3-chacha20-poly1305 'SS2022 ChaCha20-Poly1305' \
-        aes-128-gcm 'AES-128-GCM' aes-256-gcm 'AES-256-GCM' \
-        chacha20-ietf-poly1305 'ChaCha20-IETF-Poly1305' xchacha20-ietf-poly1305 'XChaCha20-IETF-Poly1305'
+        aes-128-gcm 'AES-128-GCM（传统 AEAD）' aes-256-gcm 'AES-256-GCM（传统 AEAD）' \
+        chacha20-ietf-poly1305 'ChaCha20-IETF-Poly1305（传统 AEAD）' xchacha20-ietf-poly1305 'XChaCha20-IETF-Poly1305（传统 AEAD）'
 }
 select_reality_sni() {
     local value result
@@ -219,6 +219,7 @@ build_node() {
       '{id:"",name:$name,protocol:$protocol,kind:$kind,network:$net,security:$sec,manual_tls:$manual,listen:$listen,inbound_revision:1,outbound_revision:1,
       endpoint:{address:$addr,port:$port,domain:$domain,path:$path},backend:{port:0},credentials:{id:$id,password:$pass,method:$method,private_key:$private,public_key:$public,short_id:$sid,username:$user,seed:$seed,header:$header},
       sni:$sni,remote:{address:$remote,port:$rp},outbound:{protocol:"freedom",settings:{}}}')
+    if [[ $network == kcp ]]; then NODE=$(jq '.kcp_compat="legacy"' <<< "$NODE"); fi
     if [[ $OPT_MANUAL == true ]]; then
         [[ $security == nginx ]] || { die 'no-auto-tls 仅适用于反代 TLS 协议。'; return; }
         NODE=$(jq '.security="none"' <<< "$NODE")

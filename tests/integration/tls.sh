@@ -80,6 +80,7 @@ manager a tcp 24552 --address 127.0.0.1 >/dev/null
 manager a kcp 24553 --address 127.0.0.1 >/dev/null
 manager a ss 24554 --address 127.0.0.1 >/dev/null
 manager a reality 24555 --address 127.0.0.1 >/dev/null
+manager a ss 24556 auto chacha20-ietf-poly1305 --address 127.0.0.1 >/dev/null
 port=25001
 for file in "$ROOT/current/nodes/"*.json; do
     id=$(jq -r .id "$file"); protocol=$(jq -r .protocol "$file")
@@ -110,4 +111,34 @@ for file in "$ROOT/current/nodes/"*.json; do
     printf 'PASS: real %s client TCP/UDP round trip\n' "$protocol"
     kill "$client_pid"; wait "$client_pid" || true
     ((port+=1))
+    for client in /opt/xray-clients/*/xray; do
+        [[ -x $client ]] || continue
+        client_version=$(basename "$(dirname "$client")")
+        case $protocol in
+            Hysteria2) continue;;
+            VLESS-XHTTP-TLS) [[ $client_version == v24.12.31 ]] || continue;;
+        esac
+        manager genc "$id" legacy | jq --argjson p "$port" '{log:{loglevel:"warning"},inbounds:[{listen:"127.0.0.1",port:$p,protocol:"socks",settings:{udp:true}}],outbounds:[.]}' > "$ROOT/legacy-$id.json"
+        "$client" run -test -c "$ROOT/legacy-$id.json" > "$ROOT/legacy-$id.log" 2>&1 || { cat "$ROOT/legacy-$id.log" >&2; exit 1; }
+        "$client" run -c "$ROOT/legacy-$id.json" > "$ROOT/legacy-$id.log" 2>&1 & client_pid=$!; PIDS+=("$client_pid")
+        sleep .3
+        if [[ $protocol == VLESS-REALITY ]]; then
+            # The pinned upstream REALITY implementation rejects ClientHello
+            # without X25519MLKEM768 before it checks optional version bounds.
+            if curl --fail --silent --show-error --max-time 3 --proxy "socks5h://127.0.0.1:$port" http://8.8.4.4:18080 >/dev/null 2>&1; then
+                printf 'Unexpected old REALITY handshake result; review pinned-core compatibility boundary.\n' >&2; exit 1
+            fi
+            printf 'EXPECTED BOUNDARY: %s REALITY config parses, upstream core rejects old TLS ClientHello\n' "$client_version"
+            kill "$client_pid"; wait "$client_pid" || true
+            ((port+=1)); continue
+        fi
+        if ! curl --fail --silent --show-error --max-time 8 --proxy "socks5h://127.0.0.1:$port" http://8.8.4.4:18080 >/dev/null; then
+            printf 'FAIL: %s client -> %s server\n' "$client_version" "$protocol" >&2
+            cat "$ROOT/legacy-$id.log" "$ROOT/core.log" >&2; exit 1
+        fi
+        python3 /src/tests/fixtures/udp_client.py "$port" || { cat "$ROOT/legacy-$id.log" >&2; exit 1; }
+        printf 'PASS: %s client -> current %s server TCP/UDP\n' "$client_version" "$protocol"
+        kill "$client_pid"; wait "$client_pid" || true
+        ((port+=1))
+    done
 done

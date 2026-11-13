@@ -19,4 +19,6 @@
 
 HTTP CONNECT 只有 TCP；配置到入口后业务 UDP 由规则阻断，不自动回退。SOCKS5 的 UDP 可用性取决于上游 UDP ASSOCIATE 支持和可达性。SS2022 的密码必须是与算法匹配的 Base64 密钥。
 
-动态端口、旧 HTTP/H2/QUIC transport 和已移除的旧式伪装 header 不伪装成可用功能。当前 mKCP 使用 seed 与核心默认封装。
+动态端口、旧 HTTP/H2/QUIC transport 和已移除的旧式伪装 header 不伪装成可用功能。新建 mKCP 在当前核心使用 `finalmask.udp` 的 `mkcp-legacy` 封装，并将 seed 作为其 `settings.value`；`legacy` 客户端 JSON 将相同 seed 写入旧版 `kcpSettings.seed`。VMess 分享链接的 `path` 对应此 seed。
+
+旧脚本创建的 mKCP 节点没有封装标识，继续保留其原始无 mask 行为，脚本升级不会自动改变线上数据格式。要将某个旧节点改为兼容封装，显式执行 `xray seed 节点ID auto`，然后重新导出该节点的客户端配置。

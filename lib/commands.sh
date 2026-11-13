@@ -10,7 +10,8 @@ help_text() {
   c, change [节点] [修改项] [值...]
   d, del, rm [节点]                dd, ddel 节点...
   i, info [节点]                  list
-  url, qr [节点]                  client, genc [节点]
+  url, qr [节点]                  client, genc [节点] [current|legacy]
+  legacy 仅切换客户端 JSON 字段格式，不设置版本上下限。
   ob [节点] [direct|分享链接]       c [节点] outbound [direct|分享链接]
 
 协议参数（auto 自动生成；TLS 协议需要 Cloudflare 凭据）：
@@ -235,7 +236,7 @@ command_change() {
             [[ $(jq -r .network <<< "$NODE") == kcp ]] || { die '此协议不支持 seed。'; return; }
             if (($#==0)) && [[ -t 0 ]]; then value=$(prompt_step '新的 mKCP seed（auto 自动生成）' auto) || return; value=$(auto_value "$value"); fi
             value=${value:-$(random_hex 12)}; nonempty "$value" || return
-            NODE=$(jq --arg v "$value" '.credentials.seed=$v|.inbound_revision+=1' <<< "$NODE");;
+            NODE=$(jq --arg v "$value" '.credentials.seed=$v|.kcp_compat="legacy"|.inbound_revision+=1' <<< "$NODE");;
         type|header|header-type|header_type)
             [[ $(jq -r .network <<< "$NODE") =~ ^(tcp|kcp)$ ]] || { die '此协议不支持 header。'; return; }
             [[ ${value:-none} == none ]] || { die '此核心不支持所请求的旧式 header。'; return; }
@@ -386,10 +387,16 @@ menu_node_action() {
     done
 }
 menu_share() {
-    local choice result
+    local choice result id
     while :; do
-        choice=$(menu_select '选择导出方式' url url '分享链接' qr '终端二维码' client 'Xray 客户端 JSON') || return
-        if menu_run "$choice"; then return
+        choice=$(menu_select '选择导出方式' url url '分享链接' qr '终端二维码' client 'Xray 客户端 JSON' legacy 'Xray 客户端 JSON（旧式字段）') || return
+        set -- "$choice"
+        if [[ $choice == legacy ]]; then
+            load_state
+            if id=$(node_select ''); then set -- client "$id" legacy
+            else result=$?; [[ $result == 125 ]] && continue; return "$result"; fi
+        fi
+        if menu_run "$@"; then return
         else result=$?; [[ $result == 125 ]] || return "$result"; fi
     done
 }
@@ -526,8 +533,8 @@ main() {
             case $command in
                 i|info) node_info "$node";; url) share_uri "$node";;
                 qr) need qrencode; share_uri "$node" | qrencode -t ANSIUTF8;;
-                client) node=$(client_json "$node") || return; jq -n --argjson o "$node" '{inbounds:[{listen:"127.0.0.1",port:1080,protocol:"socks",settings:{udp:true}}],outbounds:[$o]}' ;;
-                genc) client_json "$node";; debug) json_redact <<< "$node";;
+                client) node=$(client_json "$node" "${2:-current}") || return; jq -n --argjson o "$node" '{inbounds:[{listen:"127.0.0.1",port:1080,protocol:"socks",settings:{udp:true}}],outbounds:[$o]}' ;;
+                genc) client_json "$node" "${2:-current}";; debug) json_redact <<< "$node";;
             esac;;
         new|full|port|id|passwd|pass|password|method|ssm|ss-method|ss_method|key|sni|host|path|seed|type|header|web|username|address|dda|ddp|dp|dynamicport|dynamic-port|publickey|privatekey|servername|servernames|kcpseed|kcp-seed|kcp_seed|header-type|header_type|door-addr|door_addr|door-port|door_port|proxy-site)
             command_change "${1:-}" "$command" "${@:2}";;

@@ -61,6 +61,15 @@
 - 正式发布工作流 [43359353518](https://github.com/tktkl/Xray/actions/runs/43359353518) 的八个环境全部通过；实际下载附件的 SHA256 正确，26 个程序包文件及独立入口匹配发布标签。
 - 从公开 Release 实际更新后，已安装菜单通过主菜单退出和多层返回验证，已提交节点配置与核心 PID 保持不变。
 
+## 2026-11-13：v0.1.4 新旧客户端互通检查
+
+- 通过 `ssh nl` 检查实际安装：脚本 v0.1.1、核心 v26.11.9，两个 REALITY 节点配置验证通过；服务用户为专用账号，Unix socket API 生效，未配置 `minClientVer`／`maxClientVer`。检查前后节点数量及核心 PID 保持不变，未更新或重启生产服务。
+- 核对 XTLS 官方最新 Release、配置文档和 v26.11.9 使用的 REALITY 源码。发现最新 REALITY 底层会拒绝缺少 X25519MLKEM768 的 ClientHello，此边界不取决于脚本是否设置版本上下限。
+- 修复客户端 JSON 仅使用 REALITY `password` 导致旧样本报缺少 `publicKey` 的问题。新增 `client/genc 节点ID legacy`，按旧布局导出 WS Host 和 mKCP seed，不设置客户端版本门槛。
+- 新建 mKCP 使用官方 `finalmask`／`mkcp-legacy`，VMess 分享链接带有真实 seed；旧脚本已创建的原始 mKCP 节点保持原数据格式，避免无意断开现有客户端。
+- 本地 Ubuntu 24.04 ARM64 通过 ShellCheck、25 项 Bats、PTY 和完整真实核心／Nginx／本地 CA 测试。额外使用官方且校验摘要的 v1.8.4、v1.8.24、v24.12.31 客户端连接当前服务端，VMess TCP／mKCP、VMess／VLESS／Trojan WS／gRPC、SS2022 和传统 SS AEAD 的 TCP／UDP 往返通过；v24.12.31 的 XHTTP TCP／UDP 也通过。
+- 同时保留 REALITY 边界的反向测试：旧样本可以读取修复后的 JSON，但 TLS 握手被上游拒绝，不计为互通成功。对 `nl` 原有节点的公网测试也得到相同结果；当前客户端访问测试 HTTPS 页面成功。测试没有输出或提交生产节点凭据。
+
 ## 测试边界
 
 - REALITY 客户端握手使用本地 TLS 1.3/H2 目标；测试开关只在 `/tmp/` 隔离状态目录生效。两个真实 Apple 站点的可达性必须在部署服务器检查。

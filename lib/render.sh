@@ -5,9 +5,10 @@ render_config() {
 }
 client_json() {
     # Reuse the same protocol rendering definitions for server and client.
-    local defs
+    local defs profile=${2:-current}
+    [[ $profile == current || $profile == legacy ]] || { die '客户端格式可选 current 或 legacy；不检查或限制客户端版本。'; return; }
     defs=$(sed '/^\. as \$state/,$d' "$MANAGER_HOME/jq/render.jq")
-    jq "$defs client_outbound" <<< "$1"
+    jq --arg client_profile "$profile" "$defs client_outbound(\$client_profile)" <<< "$1"
 }
 share_uri() {
     local node=$1 scheme id address port host security type name path query method password auth
@@ -23,7 +24,7 @@ share_uri() {
             auth=$(printf '%s' "$method:$password" | openssl base64 -A)
             printf 'ss://%s@%s:%s#%s\n' "$auth" "$address" "$port" "$name";;
         vmess)
-            jq -cn --argjson n "$node" '{v:"2",ps:$n.name,add:$n.endpoint.address,port:($n.endpoint.port|tostring),id:$n.credentials.id,aid:"0",scy:"auto",net:$n.network,type:"none",host:$n.endpoint.domain,path:$n.endpoint.path,tls:(if $n.security=="nginx" or $n.security=="tls" then "tls" else "" end),sni:$n.endpoint.domain}' | tr -d '\n' | openssl base64 -A | { IFS= read -r auth || :; printf 'vmess://%s\n' "$auth"; };;
+            jq -cn --argjson n "$node" '{v:"2",ps:$n.name,add:$n.endpoint.address,port:($n.endpoint.port|tostring),id:$n.credentials.id,aid:"0",scy:"auto",net:$n.network,type:"none",host:$n.endpoint.domain,path:(if $n.network=="kcp" then (if ($n.kcp_compat//"native")=="legacy" then $n.credentials.seed else "" end) else $n.endpoint.path end),tls:(if $n.security=="nginx" or $n.security=="tls" then "tls" else "" end),sni:$n.endpoint.domain}' | tr -d '\n' | openssl base64 -A | { IFS= read -r auth || :; printf 'vmess://%s\n' "$auth"; };;
         vless|trojan)
             query="security=$security&type=$type"
             [[ $scheme == vless ]] && query+="&encryption=none"
