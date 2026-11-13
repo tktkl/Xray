@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-VERSION=0.1.0
+VERSION=0.1.1
 MANAGER_ENTRYPOINT=${XRAY_MANAGER_ENTRYPOINT:-/usr/local/lib/xray-manager/bin/xray}
 ROOT=${XRAY_MANAGER_ROOT:-/var/lib/xray-manager}
 CORE=${XRAY_CORE_BIN:-/usr/local/lib/xray-manager/core/xray}
@@ -37,8 +37,39 @@ valid_path() { [[ $1 =~ ^/[a-zA-Z0-9_./~-]*$ && $1 != *..* && $1 != *//* ]]; }
 prompt() {
     local message=$1 default=${2:-} answer
     [[ -t 0 ]] || { [[ -n $default ]] && { printf '%s' "$default"; return; }; die "非交互模式缺少参数：$message"; return; }
-    read -r -p "$message${default:+ [$default]}: " answer
+    read -r -p "$message${default:+ [$default]}: " answer || return 130
     printf '%s' "${answer:-$default}"
+}
+# Menus write their presentation to stderr; stdout contains only the selected value.
+menu_select() {
+    local title=$1 default=$2 answer key default_number='' index i
+    shift 2
+    local -a values=() labels=()
+    while (($#>=2)); do
+        values+=("$1"); labels+=("$2"); shift 2
+    done
+    ((${#values[@]})) || { die '菜单没有可用选项。'; return; }
+    for i in "${!values[@]}"; do
+        [[ ${values[$i]} != "$default" ]] || default_number=$((i+1))
+    done
+    if [[ ! -t 0 ]]; then
+        [[ -n $default_number ]] || { die "非交互模式请指定参数：$title"; return; }
+        printf '%s' "$default"; return
+    fi
+    printf '\n%s\n' "$title" >&2
+    for i in "${!values[@]}"; do printf '%2d) %s\n' "$((i+1))" "${labels[$i]}" >&2; done
+    printf ' 0) 取消／返回\n' >&2
+    while :; do
+        answer=$(prompt '请输入序号' "$default_number") || return
+        [[ $answer != 0 ]] || { note '已取消。'; return 130; }
+        if [[ $answer =~ ^[0-9]{1,6}$ ]] && ((10#$answer>=1 && 10#$answer<=${#values[@]})); then
+            index=$((10#$answer-1)); printf '%s' "${values[$index]}"; return
+        fi
+        for key in "${values[@]}"; do
+            if [[ $answer == "$key" ]]; then printf '%s' "$key"; return; fi
+        done
+        note "无效选择，请输入 1–${#values[@]}，或输入 0 取消。"
+    done
 }
 auto_value() { [[ ${1:-} == auto ]] && printf '' || printf '%s' "${1:-}"; }
 sync_path() { sync -f "$1"; }

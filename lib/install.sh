@@ -180,7 +180,7 @@ wait_api() {
 update_manager() {
     local version=${1:-} tmp install_home=/usr/local/lib/xray-manager release previous code_fd f
     (($#==0)) || shift
-    [[ $version =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { die '请指定脚本版本，例如 update sh v0.1.0。'; return; }
+    [[ $version =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { die "请指定脚本版本，例如 update sh v$VERSION。"; return; }
     [[ -f $MANAGER_HOME/bootstrap.sh ]] || { die '缺少 Release 下载入口，请使用新版安装包。'; return; }
     tmp=$(mktemp -d "$ROOT/script-update.XXXXXX")
     if ! bash "$MANAGER_HOME/bootstrap.sh" --version "$version" --download-only "$tmp/source" "$@"; then
@@ -205,6 +205,7 @@ update_manager() {
     fi
     flock -u "$code_fd"; exec {code_fd}>&-
     rm -rf "$tmp"
+    note "管理脚本已更新至 $version。"
 }
 uninstall_manager() {
     require_root

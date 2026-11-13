@@ -2,12 +2,13 @@
 set -Eeuo pipefail
 [[ $(ps -p 1 -o comm=) == systemd ]]
 cd /src
+version="v$(awk -F= '/^VERSION=/{print $2;exit}' lib/common.sh)"
 release_fixture=''
 if [[ ${XRAY_TEST_RELEASE_BOOTSTRAP:-0} == 1 ]]; then
     # /tmp may be noexec in a systemd container; the curl fixture must execute.
     release_fixture=$(mktemp -d /var/tmp/xray-public-release.XXXXXX)
     mkdir -p "$release_fixture/bin"
-    bash scripts/package-release.sh v0.1.0 "$release_fixture/release"
+    bash scripts/package-release.sh "$version" "$release_fixture/release"
     cp tests/fixtures/release-curl "$release_fixture/bin/curl"
     chmod +x "$release_fixture/bin/curl"
     PATH="$release_fixture/bin:$PATH" BOOTSTRAP_FIXTURE="$release_fixture/release" \
@@ -42,7 +43,7 @@ if [[ -n $release_fixture ]]; then
     before=$(systemctl show xray-manager.service --property=MainPID --value)
     previous_code=$(readlink -f /usr/local/lib/xray-manager/code-current)
     PATH="$release_fixture/bin:$PATH" BOOTSTRAP_FIXTURE="$release_fixture/release" \
-        xray update sh v0.1.0
+        xray update sh "$version"
     [[ $(systemctl show xray-manager.service --property=MainPID --value) == "$before" ]]
     [[ $(readlink -f /usr/local/lib/xray-manager/code-current) != "$previous_code" ]]
     printf 'PASS: public Release installation and verified atomic script update without GitHub credentials\n'

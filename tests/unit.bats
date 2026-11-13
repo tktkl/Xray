@@ -87,6 +87,10 @@ teardown() { teardown_manager; }
     run node_select n002
     assert_status 0
     [[ $output == n002 ]]
+    STATE='{"nodes":[{"id":"n001","name":"first"},{"id":"n002","name":"n001"}]}'
+    run node_select n001
+    assert_status 0
+    [[ $output == n001 ]]
 }
 @test "Debug redacts both user/pass and VLESS/REALITY credentials" {
     result=$(json_redact <<<'{"id":"n001","pass":"secret","password":"secret","username":"account","private_key":"key","short_id":"ab","seed":"seed","nested":{"auth":"auth"}}')

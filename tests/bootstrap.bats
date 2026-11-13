@@ -3,6 +3,7 @@ setup() {
     TEST_ROOT=$(mktemp -d /tmp/xray-bootstrap-test.XXXXXX)
     export BOOTSTRAP_FIXTURE="$TEST_ROOT/release"
     export BOOTSTRAP_RECORD="$TEST_ROOT/invoked"
+    export BOOTSTRAP_VERSION="v$(awk -F= '/^VERSION=/{print $2;exit}' /src/lib/common.sh)"
     export TMPDIR="$TEST_ROOT/tmp"
     mkdir -p "$BOOTSTRAP_FIXTURE" "$TEST_ROOT/bin" "$TMPDIR"
     cp /src/tests/fixtures/release-curl "$TEST_ROOT/bin/curl"
@@ -16,8 +17,8 @@ setup() {
 }
 teardown() { rm -rf "$TEST_ROOT"; }
 make_archive() {
-    tar -czf "$BOOTSTRAP_FIXTURE/xray-manager-v0.1.0.tar.gz" -C "$PACKAGE" bin lib jq config systemd
-    (cd "$BOOTSTRAP_FIXTURE" && sha256sum xray-manager-v0.1.0.tar.gz > SHA256SUMS)
+    tar -czf "$BOOTSTRAP_FIXTURE/xray-manager-$BOOTSTRAP_VERSION.tar.gz" -C "$PACKAGE" bin lib jq config systemd
+    (cd "$BOOTSTRAP_FIXTURE" && sha256sum "xray-manager-$BOOTSTRAP_VERSION.tar.gz" > SHA256SUMS)
 }
 bootstrap() { bash /src/bootstrap.sh "$@"; }
 
@@ -29,7 +30,7 @@ bootstrap() { bash /src/bootstrap.sh "$@"; }
     [[ $output != *github_pat* ]]
 }
 @test "Public Release: wrong checksum never executes code" {
-    printf '%064d  xray-manager-v0.1.0.tar.gz\n' 0 > "$BOOTSTRAP_FIXTURE/SHA256SUMS"
+    printf '%064d  xray-manager-%s.tar.gz\n' 0 "$BOOTSTRAP_VERSION" > "$BOOTSTRAP_FIXTURE/SHA256SUMS"
     run bootstrap
     [[ $status != 0 && ! -e $BOOTSTRAP_RECORD ]]
     [[ $(find "$TMPDIR" -mindepth 1 | wc -l) == 0 ]]
@@ -47,8 +48,8 @@ bootstrap() { bash /src/bootstrap.sh "$@"; }
     [[ $output != *github_pat* ]]
 }
 @test "Public Release: archive path traversal is rejected even with matching checksum" {
-    tar -czf "$BOOTSTRAP_FIXTURE/xray-manager-v0.1.0.tar.gz" --transform='s|bin/xray|../outside|' -C "$PACKAGE" bin lib jq config systemd
-    (cd "$BOOTSTRAP_FIXTURE" && sha256sum xray-manager-v0.1.0.tar.gz > SHA256SUMS)
+    tar -czf "$BOOTSTRAP_FIXTURE/xray-manager-$BOOTSTRAP_VERSION.tar.gz" --transform='s|bin/xray|../outside|' -C "$PACKAGE" bin lib jq config systemd
+    (cd "$BOOTSTRAP_FIXTURE" && sha256sum "xray-manager-$BOOTSTRAP_VERSION.tar.gz" > SHA256SUMS)
     run bootstrap
     [[ $status != 0 && ! -e $BOOTSTRAP_RECORD ]]
     [[ ! -e $TEST_ROOT/outside ]]

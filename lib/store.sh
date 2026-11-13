@@ -48,8 +48,10 @@ new_generation() {
     sync_path "$CANDIDATE"
 }
 node_select() {
-    local selector=${1:-} matches count answer
+    local selector=${1:-} matches count id label
+    local -a options=()
     if [[ -n $selector ]]; then
+        if jq -e --arg s "$selector" '.nodes[]|select(.id==$s)' <<< "$STATE" >/dev/null; then printf '%s' "$selector"; return; fi
         matches=$(jq --arg s "$selector" '[.nodes[]|select(.id==$s or .name==$s)]' <<< "$STATE")
         if [[ $(jq length <<< "$matches") == 0 ]]; then
             matches=$(jq --arg s "$selector" '[.nodes[]|select((.name|ascii_downcase|contains($s|ascii_downcase)) or (.id|contains($s)))]' <<< "$STATE")
@@ -59,10 +61,9 @@ node_select() {
     ((count > 0)) || { die '没有匹配的节点。'; return; }
     if ((count == 1)); then jq -r '.[0].id' <<< "$matches"; return; fi
     [[ -t 0 ]] || { die '匹配多个节点，请指定精确 ID。'; return; }
-    jq -r 'to_entries[]|"\(.key+1)) \(.value.id) \(.value.name) \(.value.protocol) :\(.value.endpoint.port)"' <<< "$matches" >&2
-    answer=$(prompt '选择节点序号')
-    [[ $answer =~ ^[0-9]+$ ]] && ((answer>=1 && answer<=count)) || { die '无效选择。'; return; }
-    jq -r --argjson i "$((answer-1))" '.[$i].id' <<< "$matches"
+    while IFS=$'\t' read -r id label; do options+=("$id" "$label"); done < <(
+        jq -r '.[]|[.id,"\(.id)  \(.name)  \(.protocol // "")  :\(.endpoint.port // "")"]|@tsv' <<< "$matches")
+    menu_select '选择节点' '' "${options[@]}"
 }
 replace_node() { STATE=$(jq --argjson n "$1" '.nodes |= map(if .id==$n.id then $n else . end)' <<< "$STATE"); }
 allocate_id() {

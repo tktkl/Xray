@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 help_text() {
+    printf 'Xray 独立管理脚本 %s\n' "$VERSION"
     cat <<'EOF'
-Xray 独立管理脚本 0.1.0
 用法：xray [命令] [参数]；不带参数打开菜单。
+交互选项按序号选择，0 取消；带参数的原有命令保持可用。
 
 节点：
   a, add [协议] [参数...|auto] [--name 名称] [--address 对外地址]
@@ -73,9 +74,13 @@ attach_domain() {
 }
 command_add() {
     local protocol=${1:-} id backend
-    if [[ -z $protocol ]]; then protocol=$(prompt '协议 reality/ss/tcp/kcp/vws/vgrpc/xhttp/tws/tgrpc/hy2/socks/door' reality)
-    else shift; fi
-    build_node "$protocol" '{}' "$@" || return
+    if [[ -z $protocol ]]; then
+        protocol=$(select_protocol) || return
+        build_node_interactive "$protocol" '{}' || return
+    else
+        shift
+        build_node "$protocol" '{}' "$@" || return
+    fi
     prepare_node_resources || return
     write_begin || return
     id=$(allocate_id); backend=$(free_port)
@@ -93,28 +98,65 @@ node_info() {
     share_uri "$n" || true
 }
 command_list() {
+    if [[ $(jq '.nodes|length' <<< "$STATE") == 0 ]]; then note '暂无节点，请选择添加节点，或运行 xray a。'; return; fi
     jq -r '.nodes[]|[.id,.name,.protocol,(.endpoint.address+":"+(.endpoint.port|tostring)),.outbound.protocol]|@tsv' <<< "$STATE"
+}
+select_change_option() {
+    local n=$1 kind security network
+    kind=$(jq -r .kind <<< "$n"); security=$(jq -r .security <<< "$n"); network=$(jq -r .network <<< "$n")
+    local -a options=(port '修改公网端口' new '切换入口协议' outbound '设置节点出口' address '修改对外地址')
+    case $kind in
+        vless|vmess) options+=(id '修改 UUID');;
+        shadowsocks|trojan|hysteria|socks) options+=(passwd '修改密码');;
+    esac
+    [[ $security != reality ]] || options+=(sni '修改 REALITY SNI' key '修改 REALITY 密钥')
+    [[ $kind != shadowsocks ]] || options+=(method '修改 SS 加密方式（同时生成新密码）')
+    [[ $kind != socks ]] || options+=(username '修改 SOCKS 用户名')
+    [[ $kind != dokodemo-door ]] || options+=(dda '修改转发目标地址' ddp '修改转发目标端口')
+    if [[ $security == nginx || $security == tls ]]; then options+=(host '修改证书域名'); fi
+    if [[ $network =~ ^(ws|grpc|xhttp)$ ]]; then options+=(path '修改路径／gRPC 服务名'); fi
+    [[ $security != nginx ]] || options+=(web '修改域名共享的伪装网站')
+    [[ $network != kcp ]] || options+=(seed '修改 mKCP seed')
+    options+=(full '重建当前节点')
+    menu_select "修改节点 $(jq -r '.id+"（"+.protocol+"）"' <<< "$n")" port "${options[@]}"
+}
+select_outbound() {
+    local value
+    value=$(menu_select '设置节点出口' direct direct '本机直连' import '粘贴上游分享链接（SS／VLESS／VMess／Trojan／SOCKS5／HTTP）') || return
+    if [[ $value == import ]]; then value=$(prompt '请粘贴完整的出口分享链接') || return; fi
+    printf '%s' "$value"
+}
+select_website() {
+    local value
+    value=$(menu_select '选择域名共享的伪装网站' static static '本地静态网站' proxy '反向代理指定 HTTPS 网站') || return
+    if [[ $value == proxy ]]; then value=$(prompt '伪装网站域名（不含 https:// 和路径）') || return; fi
+    printf '%s' "$value"
 }
 command_change() {
     local selector=${1:-} option=${2:-} id old value method public private domain args protocol
-    (($#<2)) || shift 2
+    (($#==0)) || shift
+    (($#==0)) || shift
     id=$(node_select "$selector") || return
     old=$(jq --arg id "$id" '.nodes[]|select(.id==$id)' <<< "$STATE")
     NODE=$old
-    if [[ -z $option ]]; then option=$(prompt '修改项 port/id/passwd/new/outbound/host/path/sni/web' port); fi
+    if [[ -z $option ]]; then option=$(select_change_option "$old") || return; fi
     value=$(auto_value "${1:-}")
     case $option in
         new)
-            protocol=${1:-$(prompt '新的协议' reality)}
-            (($#==0)) || shift
             if (($#==0)); then
-                case $(canonical_protocol "$protocol") in
-                    *-TLS) set -- "$(jq -r .endpoint.domain <<< "$old")";;
-                    *) set -- "$(jq -r .endpoint.port <<< "$old")";;
-                esac
-                set -- "$@" --address "$(jq -r .endpoint.address <<< "$old")"
+                protocol=$(select_protocol) || return
+                build_node_interactive "$protocol" "$old" || return
+            else
+                protocol=$1; shift
+                if (($#==0)); then
+                    case $(canonical_protocol "$protocol") in
+                        *-TLS) set -- "$(jq -r .endpoint.domain <<< "$old")";;
+                        *) set -- "$(jq -r .endpoint.port <<< "$old")";;
+                    esac
+                    set -- "$@" --address "$(jq -r .endpoint.address <<< "$old")"
+                fi
+                build_node "$protocol" "$old" "$@" || return
             fi
-            build_node "$protocol" "$old" "$@" || return
             NODE=$(jq --argjson old "$old" '.id=$old.id|.name=(if .name=="" then $old.name else .name end)|.outbound=$old.outbound|.outbound_revision=$old.outbound_revision|.inbound_revision=($old.inbound_revision+1)|.backend=$old.backend' <<< "$NODE");;
         full)
             if (($#)); then
@@ -123,20 +165,23 @@ command_change() {
                 NODE=$(jq --argjson old "$old" '.id=$old.id|.name=$old.name|.outbound=$old.outbound|.outbound_revision=$old.outbound_revision|.inbound_revision=($old.inbound_revision+1)|.backend=$old.backend' <<< "$NODE")
             else NODE=$(jq '.inbound_revision+=1' <<< "$old"); fi;;
         ob|outbound)
-            value=${value:-$(prompt '出口：direct 或粘贴 ss/vless/vmess/trojan/socks5/http 链接' direct)}
+            if [[ -z $value ]]; then value=$(select_outbound) || return; fi
             if [[ $value == direct ]]; then value='{"protocol":"freedom","settings":{}}'
             else value=$(outbound_from_uri "$value") || return; fi
             NODE=$(jq --argjson o "$value" '.outbound=$o|.outbound_revision+=1' <<< "$NODE");;
         port)
+            if (($#==0)) && [[ -t 0 ]]; then value=$(prompt '新的公网端口（auto 随机分配）' auto) || return; value=$(auto_value "$value"); fi
             value=${value:-$(free_port)}; valid_port "$value" || { die '无效端口。'; return; }
             value=$((10#$value))
             NODE=$(jq --argjson p "$value" '.endpoint.port=$p|.inbound_revision+=(if .security=="nginx" then 0 else 1 end)' <<< "$NODE");;
         id|uuid)
             [[ $(jq -r .kind <<< "$NODE") =~ ^(vless|vmess)$ ]] || { die '当前协议不使用 UUID。'; return; }
+            if (($#==0)) && [[ -t 0 ]]; then value=$(prompt '新 UUID（auto 自动生成）' auto) || return; value=$(auto_value "$value"); fi
             value=${value:-$(uuid)}; valid_uuid "$value" || { die '无效 UUID。'; return; }
             NODE=$(jq --arg v "$value" '.credentials.id=$v|.inbound_revision+=1' <<< "$NODE");;
         passwd|pass|password)
             [[ $(jq -r .kind <<< "$NODE") =~ ^(shadowsocks|trojan|hysteria|socks)$ ]] || { die '当前协议不使用密码。'; return; }
+            if (($#==0)) && [[ -t 0 ]]; then value=$(prompt '新密码（auto 自动生成）' auto) || return; value=$(auto_value "$value"); fi
             method=$(jq -r .credentials.method <<< "$NODE")
             if [[ $(jq -r .kind <<< "$NODE") == shadowsocks ]]; then value=${value:-$(ss_password "$method")}; validate_ss "$method" "$value" || return
             else value=${value:-$(random_hex 24)}; fi
@@ -144,11 +189,13 @@ command_change() {
             NODE=$(jq --arg v "$value" '.credentials.password=$v|.inbound_revision+=1' <<< "$NODE");;
         method|ssm|ss-method|ss_method)
             [[ $(jq -r .kind <<< "$NODE") == shadowsocks ]] || { die '只有 SS 支持 method。'; return; }
+            if (($#==0)) && [[ -t 0 ]]; then value=$(select_ss_method) || return; fi
             value=${value:-2022-blake3-aes-128-gcm}
             args=$(ss_password "$value"); validate_ss "$value" "$args" || return
             NODE=$(jq --arg m "$value" --arg p "$args" '.credentials.method=$m|.credentials.password=$p|.inbound_revision+=1' <<< "$NODE");;
         key|publickey|privatekey)
             [[ $(jq -r .security <<< "$NODE") == reality ]] || { die '只有 REALITY 支持此密钥修改。'; return; }
+            if (($#==0)) && [[ -t 0 ]]; then value=$(prompt 'REALITY 私钥（auto 生成新密钥）' auto) || return; value=$(auto_value "$value"); fi
             if [[ -n $value ]]; then args=$("$CORE" x25519 -i "$value") || return
             else args=$("$CORE" x25519) || return; fi
             private=$(awk -F ': ' '/^Private[Kk]ey:/{print $2}' <<< "$args")
@@ -158,22 +205,27 @@ command_change() {
             NODE=$(jq --arg private "$private" --arg public "$public" '.credentials.private_key=$private|.credentials.public_key=$public|.inbound_revision+=1' <<< "$NODE");;
         sni|servername|servernames)
             [[ $(jq -r .security <<< "$NODE") == reality ]] || { die '此命令只修改 REALITY SNI。'; return; }
+            if (($#==0)) && [[ -t 0 ]]; then value=$(select_reality_sni) || return; value=$(auto_value "$value"); fi
             value=${value:-$(choose_reality)}; probe_reality "$value" || { die 'SNI 检测失败。'; return; }
             NODE=$(jq --arg v "$value" '.sni=$v|.inbound_revision+=1' <<< "$NODE");;
         host)
             [[ -n $(jq -r .endpoint.domain <<< "$NODE") ]] || { die '此节点不使用证书域名。'; return; }
-            value=${value:-$(prompt '新域名')}; value=${value,,}
+            if [[ -z $value ]]; then value=$(prompt '新域名') || return; fi
+            value=${value,,}
             valid_domain "$value" || { die '无效域名。'; return; }
             NODE=$(jq --arg v "$value" '.endpoint.domain=$v|.endpoint.address=$v|.inbound_revision+=1' <<< "$NODE");;
         address)
-            value=${value:-$(prompt '对外地址')}; valid_address "$value" || return
+            if [[ -z $value ]]; then value=$(prompt '对外地址') || return; fi
+            valid_address "$value" || return
             NODE=$(jq --arg v "$value" '.endpoint.address=$v' <<< "$NODE");;
         path)
             [[ $(jq -r .network <<< "$NODE") =~ ^(ws|grpc|xhttp)$ ]] || { die '此协议没有反代路径。'; return; }
+            if (($#==0)) && [[ -t 0 ]]; then value=$(prompt '新路径／gRPC 服务名（auto 自动生成）' auto) || return; value=$(auto_value "$value"); fi
             value=${value:-/$(random_hex 12)}; valid_path "$value" && [[ $value != / ]] || { die '无效路径。'; return; }
             NODE=$(jq --arg v "$value" '.endpoint.path=$v|.inbound_revision+=1' <<< "$NODE");;
         seed|kcpseed|kcp-seed|kcp_seed)
             [[ $(jq -r .network <<< "$NODE") == kcp ]] || { die '此协议不支持 seed。'; return; }
+            if (($#==0)) && [[ -t 0 ]]; then value=$(prompt '新的 mKCP seed（auto 自动生成）' auto) || return; value=$(auto_value "$value"); fi
             value=${value:-$(random_hex 12)}; nonempty "$value" || return
             NODE=$(jq --arg v "$value" '.credentials.seed=$v|.inbound_revision+=1' <<< "$NODE");;
         type|header|header-type|header_type)
@@ -182,20 +234,24 @@ command_change() {
             NODE=$(jq '.credentials.header="none"|.inbound_revision+=1' <<< "$NODE");;
         username)
             [[ $(jq -r .kind <<< "$NODE") == socks ]] || return 1
-            value=${value:-$(prompt '用户名')}; nonempty "$value" || return
+            if [[ -z $value ]]; then value=$(prompt '用户名') || return; fi
+            nonempty "$value" || return
             NODE=$(jq --arg v "$value" '.credentials.username=$v|.inbound_revision+=1' <<< "$NODE");;
         dda|door-addr|door_addr)
             [[ $(jq -r .kind <<< "$NODE") == dokodemo-door ]] || return 1
+            if [[ -z $value ]]; then value=$(prompt '转发目标地址') || return; fi
             valid_address "$value" || return
             NODE=$(jq --arg v "$value" '.remote.address=$v|.inbound_revision+=1' <<< "$NODE");;
         ddp|door-port|door_port)
             [[ $(jq -r .kind <<< "$NODE") == dokodemo-door ]] || return 1
+            if [[ -z $value ]]; then value=$(prompt '转发目标端口') || return; fi
             valid_port "$value" || { die '无效目标端口。'; return; }
+            value=$((10#$value))
             NODE=$(jq --argjson v "$value" '.remote.port=$v|.inbound_revision+=1' <<< "$NODE");;
         web|proxy-site)
             domain=$(jq -r .endpoint.domain <<< "$NODE")
             [[ $(jq -r .security <<< "$NODE") == nginx ]] || { die '此节点没有 Nginx 站点。'; return; }
-            value=${value:-$(prompt '伪装网站域名或 static' static)}
+            if [[ -z $value ]]; then value=$(select_website) || return; fi
             [[ $value == static ]] && value=''
             [[ -z $value ]] || valid_domain "$value" || { die '伪装目标必须是固定域名。'; return; }
             note "此操作修改域名共享网站：$domain"
@@ -216,7 +272,7 @@ command_change() {
 command_delete() {
     local selector id
     local -a ids=()
-    if (($#==0)); then ids+=("$(node_select '')")
+    if (($#==0)); then id=$(node_select '') || return; ids+=("$id")
     else for selector in "$@"; do id=$(node_select "$selector") || return; ids+=("$id"); done; fi
     write_begin || return
     for id in "${ids[@]}"; do STATE=$(jq --arg id "$id" '.nodes|=map(select(.id!=$id))' <<< "$STATE"); done
@@ -225,7 +281,11 @@ command_delete() {
 }
 command_dns() {
     local value=${1:-} dns
-    [[ -n $value ]] || value=$(prompt 'DNS：none/11/88/google/cloudflare/family/set' none)
+    if [[ -z $value ]]; then
+        value=$(menu_select '选择全局 DNS（影响所有节点）' none \
+            none '使用服务器 DNS' 11 '1.1.1.1' 88 '8.8.8.8' google 'Google DoH' \
+            cloudflare 'Cloudflare DoH' family 'Cloudflare 家庭过滤 DoH' set '手动输入 DNS 地址') || return
+    fi
     case $value in
         none) dns='["localhost"]';;
         11|1111) dns='["1.1.1.1"]';;
@@ -233,7 +293,8 @@ command_dns() {
         gg|google) dns='["https+local://dns.google/dns-query"]';;
         cf|cloudflare) dns='["https+local://cloudflare-dns.com/dns-query"]';;
         nosex|family) dns='["https+local://family.cloudflare-dns.com/dns-query"]';;
-        set) value=${2:-$(prompt 'DNS 地址')}; nonempty "$value" || return; dns=$(jq -n --arg d "$value" '[$d]');;
+        set) value=${2:-}; if [[ -z $value ]]; then value=$(prompt 'DNS 地址') || return; fi
+            nonempty "$value" || return; dns=$(jq -n --arg d "$value" '[$d]');;
         *) die '未知 DNS 选项。'; return 1;;
     esac
     note 'DNS 修改是全局操作；将更新所有节点使用的解析设置。'
@@ -276,11 +337,79 @@ command_remove_resource() {
         rm -f "$ROOT/managed-certificates/$domain.json" "$ROOT/queue/$domain.json" "$ROOT/queue/$domain.error"
     fi
 }
-menu() {
+menu_share() {
     local choice
-    printf '1) 添加节点\n2) 修改节点\n3) 查看节点\n4) 删除节点\n5) 运行状态\n6) 帮助\n'
-    choice=$(prompt '选择' 1)
-    case $choice in 1) command_add;; 2) command_change;; 3) command_list;; 4) command_delete;; 5) systemctl status xray-manager.service --no-pager;; *) help_text;; esac
+    choice=$(menu_select '选择导出方式' url url '分享链接' qr '终端二维码' client 'Xray 客户端 JSON') || return
+    main "$choice"
+}
+menu_service() {
+    local choice
+    choice=$(menu_select '服务管理（停止／重启会影响整个服务）' status \
+        status '查看服务状态' start '启动 Xray' stop '停止 Xray' restart '重启 Xray' \
+        nginx-start '启动 Nginx' nginx-stop '停止 Nginx' nginx-restart '重启 Nginx') || return
+    case $choice in nginx-*) main "${choice#nginx-}" nginx;; *) main "$choice";; esac
+}
+menu_cert() {
+    local choice domain
+    choice=$(menu_select '证书与域名管理' list list '查看证书状态' setup '配置 Cloudflare Token 与邮箱' \
+        issue '签发域名证书' renew '检查并续期证书' deploy '重试部署已签发证书' \
+        delete '删除无引用的受管证书' domain '删除无引用的域名网站') || return
+    case $choice in
+        list|setup) main cert "$choice";;
+        renew|deploy)
+            domain=$(prompt '证书域名（all 表示全部）' all) || return
+            [[ $domain != all ]] || domain=''
+            main cert "$choice" "$domain";;
+        issue|delete) domain=$(prompt '证书域名') || return; main cert "$choice" "$domain";;
+        domain) domain=$(prompt '网站域名') || return; main domain delete "$domain";;
+    esac
+}
+menu_log() {
+    local choice level
+    choice=$(menu_select '日志管理' access access '查看访问日志（Ctrl+C 退出）' error '查看错误日志（Ctrl+C 退出）' \
+        level '修改全局日志级别' clear '清空访问与错误日志') || return
+    case $choice in
+        access) main log;; error) main logerr;; clear) main log del;;
+        level)
+            level=$(menu_select '全局日志级别（影响所有节点）' warning debug '调试 debug' info '信息 info' \
+                warning '警告 warning' error '错误 error' none '关闭日志') || return
+            main log "$level";;
+    esac
+}
+menu_update() {
+    local choice version
+    choice=$(menu_select '选择更新组件' core core 'Xray 核心（影响所有节点）' sh '管理脚本' dat '规则数据' \
+        nginx 'Nginx' certbot 'Certbot') || return
+    if [[ $choice == sh ]]; then
+        version=$(prompt "已发布的脚本版本（例如 v$VERSION）") || return
+        main update sh "$version"
+    else main update "$choice"; fi
+}
+menu_repair() {
+    local choice
+    choice=$(menu_select '配置检查与恢复' test test '检查当前配置' recover '恢复未完成的操作' \
+        fix '重建指定节点' fix-nginx '重建 Nginx 配置' fix-all '重建全部节点（影响所有节点）') || return
+    main "$choice"
+}
+menu() {
+    local choice result entry="$MANAGER_HOME/bin/xray" menu_home=$MANAGER_HOME
+    [[ -t 0 ]] || { help_text; return; }
+    # Installed menus follow code-current after an in-menu script update.
+    if [[ $entry -ef $MANAGER_ENTRYPOINT ]]; then entry=$MANAGER_ENTRYPOINT; menu_home=''; fi
+    while :; do
+        choice=$(menu_select 'Xray 管理菜单' a \
+            a '添加节点' c '修改节点' list '查看节点列表' d '删除节点' status '运行状态' help '帮助' \
+            ob '设置节点出口' share '导出分享链接／二维码／客户端配置' service '服务管理' cert '证书与域名管理' \
+            dns '全局 DNS 设置' logs '日志管理' update '更新组件' repair '配置检查与恢复') || {
+                result=$?; [[ $result != 130 ]] || return 0; return "$result";
+            }
+        # A fresh shell preserves errexit in each operation and reloads committed state.
+        if XRAY_MANAGER_HOME="$menu_home" bash "$entry" "$choice"; then :
+        else
+            result=$?
+            if [[ $result != 130 ]]; then note "操作未完成（退出码 $result），已返回主菜单。"; fi
+        fi
+    done
 }
 main() {
     local command=${1:-menu} id node target value
@@ -299,6 +428,7 @@ main() {
     if [[ $command == recover ]]; then context skip-recovery || return; else context || return; fi
     case $command in
         menu) menu;;
+        share) menu_share;; service) menu_service;; logs) menu_log;; repair) menu_repair;;
         a|add) command_add "$@";;
         c|config|change) command_change "$@";;
         ob) command_change "${1:-}" outbound "${@:2}";;
@@ -316,6 +446,7 @@ main() {
         new|full|port|id|passwd|pass|password|method|ssm|ss-method|ss_method|key|sni|host|path|seed|type|header|web|username|address|dda|ddp|dp|dynamicport|dynamic-port|publickey|privatekey|servername|servernames|kcpseed|kcp-seed|kcp_seed|header-type|header_type|door-addr|door_addr|door-port|door_port|proxy-site)
             command_change "${1:-}" "$command" "${@:2}";;
         cert)
+            if (($#==0)) && [[ -t 0 ]]; then menu_cert; return; fi
             target=${1:-list}; (($#==0)) || shift
             case $target in setup) cert_setup "$@";; issue) cert_issue "${1:?需要域名}";; list) cert_list;; renew) cert_renew "${1:-}";; deploy) cert_deploy "${1:-}";; enqueue) cert_enqueue "${1:-}";; delete) command_remove_resource cert "${1:-}";; *) die '未知证书命令。';; esac;;
         domain) [[ ${1:-} == delete ]] && command_remove_resource domain "${2:-}";;
@@ -340,8 +471,10 @@ main() {
         dns) command_dns "$@";;
         log|logerr|errlog) command_log "$command" "${1:-}";;
         u|up|update|U|update.sh)
+            if (($#==0)) && [[ -t 0 && $command != U && $command != update.sh ]]; then menu_update; return; fi
             target=${1:-core}; value=${2:-}
             [[ $command != U && $command != update.sh ]] || { target='sh'; value=${1:-}; }
+            if [[ $target == sh && -z $value && -t 0 ]]; then value=$(prompt "已发布的脚本版本（例如 v$VERSION）") || return; fi
             case $target in
                 core) update_core "${value:-v26.11.9}";;
                 sh)

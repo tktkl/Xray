@@ -65,6 +65,64 @@ canonical_protocol() {
         *) die '未知协议，请查看 xray help。'; return 1;;
     esac
 }
+select_protocol() {
+    menu_select '选择协议' reality \
+        reality 'VLESS-REALITY（无需自有域名）' \
+        ss 'Shadowsocks／SS2022' \
+        tcp 'VMess TCP' kcp 'VMess mKCP' \
+        ws 'VMess WS＋TLS（需要域名）' grpc 'VMess gRPC＋TLS（需要域名）' \
+        vws 'VLESS WS＋TLS（需要域名）' vgrpc 'VLESS gRPC＋TLS（需要域名）' \
+        xhttp 'VLESS XHTTP＋TLS（需要域名）' \
+        tws 'Trojan WS＋TLS（需要域名）' tgrpc 'Trojan gRPC＋TLS（需要域名）' \
+        hy2 'Hysteria2（需要域名）' socks 'SOCKS5（用户名／密码认证）' door '固定目标端口转发'
+}
+select_ss_method() {
+    menu_select '选择 Shadowsocks 加密方式' 2022-blake3-aes-128-gcm \
+        2022-blake3-aes-128-gcm 'SS2022 AES-128-GCM' \
+        2022-blake3-aes-256-gcm 'SS2022 AES-256-GCM' \
+        2022-blake3-chacha20-poly1305 'SS2022 ChaCha20-Poly1305' \
+        aes-128-gcm 'AES-128-GCM' aes-256-gcm 'AES-256-GCM' \
+        chacha20-ietf-poly1305 'ChaCha20-IETF-Poly1305' xchacha20-ietf-poly1305 'XChaCha20-IETF-Poly1305'
+}
+select_reality_sni() {
+    local value
+    value=$(menu_select '选择 REALITY SNI' auto \
+        auto '自动检测并选择预设 SNI' \
+        apps.mzstatic.com 'apps.mzstatic.com' xp.apple.com 'xp.apple.com' custom '手动输入其他 SNI') || return
+    if [[ $value == custom ]]; then value=$(prompt '请输入 SNI 域名') || return; fi
+    printf '%s' "$value"
+}
+build_node_interactive() {
+    local protocol=$1 old=${2:-'{}'} canonical domain port path method sni remote remote_port address
+    canonical=$(canonical_protocol "$protocol") || return
+    local -a args=()
+    if [[ $canonical == *-TLS ]]; then
+        domain=$(prompt '证书域名' "$(jq -r '.endpoint.domain // empty' <<< "$old")") || return
+        path=$(prompt '路径／gRPC 服务名（auto 自动生成）' auto) || return
+        port=$(prompt '公网 TCP 端口' 443) || return
+        valid_port "$port" || { die '无效端口。'; return; }
+        args=("$domain" auto "$path")
+    else
+        port=$(prompt '公网端口（auto 随机分配）' "$(jq -r '.endpoint.port // "auto"' <<< "$old")") || return
+        args=("$port")
+        case $canonical in
+            VLESS-REALITY) sni=$(select_reality_sni) || return; args+=(auto "$sni");;
+            Shadowsocks) method=$(select_ss_method) || return; args+=(auto "$method");;
+            Hysteria2)
+                domain=$(prompt '证书域名' "$(jq -r '.endpoint.domain // empty' <<< "$old")") || return
+                args+=(auto --domain "$domain");;
+            Dokodemo-Door)
+                remote=$(prompt '转发目标地址' "$(jq -r '.remote.address // empty' <<< "$old")") || return
+                remote_port=$(prompt '转发目标端口') || return
+                args+=("$remote" "$remote_port");;
+        esac
+    fi
+    address=$(jq -r '.endpoint.address // empty' <<< "$old")
+    [[ -z $address || $canonical == *-TLS || $canonical == Hysteria2 ]] || args+=(--address "$address")
+    note '连接凭据自动生成；添加后可在修改菜单中更改。'
+    build_node "$protocol" "$old" "${args[@]}" || return
+    if [[ $canonical == *-TLS ]]; then NODE=$(jq --argjson p "$((10#$port))" '.endpoint.port=$p' <<< "$NODE"); fi
+}
 parse_build_options() {
     POSITIONAL=(); OPT_DOMAIN=; OPT_ADDRESS=; OPT_NAME=; OPT_LISTEN=0.0.0.0; OPT_MANUAL=false
     while (($#)); do

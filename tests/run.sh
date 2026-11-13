@@ -10,5 +10,6 @@ if [[ ! -x /opt/xray-core/xray ]]; then
 fi
 shellcheck -S warning bin/xray install.sh bootstrap.sh scripts/*.sh lib/*.sh tests/*.sh tests/integration/*.sh tests/fixtures/systemctl tests/fixtures/core-api tests/fixtures/release-curl
 bats tests/unit.bats tests/bootstrap.bats
+bash -c 'set -Eeuo pipefail; source /src/tests/helper.bash; setup_manager; trap teardown_manager EXIT; python3 /src/tests/integration/interactive.py'
 bash tests/integration/core.sh
 bash tests/integration/tls.sh

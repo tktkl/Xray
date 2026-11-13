@@ -13,10 +13,11 @@ while (($#)); do
     esac
 done
 [[ ${BOOTSTRAP_HTTP_FAIL:-0} == 0 ]] || exit 22
+version=${BOOTSTRAP_VERSION:-v$(awk -F= '/^VERSION=/{print $2;exit}' /src/lib/common.sh)}
 case $url in
-    https://github.com/tktkl/Xray/releases/download/v0.1.0/xray-manager-v0.1.0.tar.gz)
-        cp "$BOOTSTRAP_FIXTURE/xray-manager-v0.1.0.tar.gz" "$output";;
-    https://github.com/tktkl/Xray/releases/download/v0.1.0/SHA256SUMS)
+    "https://github.com/tktkl/Xray/releases/download/$version/xray-manager-$version.tar.gz")
+        cp "$BOOTSTRAP_FIXTURE/xray-manager-$version.tar.gz" "$output";;
+    "https://github.com/tktkl/Xray/releases/download/$version/SHA256SUMS")
         cp "$BOOTSTRAP_FIXTURE/SHA256SUMS" "$output";;
     *) exit 22;;
 esac
