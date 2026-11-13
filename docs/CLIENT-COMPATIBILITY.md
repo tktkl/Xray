@@ -68,3 +68,16 @@ WS／gRPC 在当前核心仍可使用，但官方已标记为不推荐并建议�
 ## 验证范围
 
 测试同时启动当前服务端与官方旧客户端样本，检查实际 TCP／UDP 往返。旧核心附件有固定 SHA256，只用于测试；清单位于 `tests/client-releases.json`。部分旧样本没有 Hysteria2 或 XHTTP，不能将其未实现能力算成格式兼容成功。REALITY 的拒绝行为作为独立边界验证，不计为互通通过。
+
+v0.1.4 的 [八环境发布 CI](https://github.com/tktkl/Xray/actions/runs/43375059523) 已通过，结果如下。这些是已测试样本，不是客户端最低版本要求。
+
+| 入口 | v1.8.4／v1.8.24／v24.12.31 样本结果 |
+|---|---|
+| VMess TCP／mKCP | 三个样本 TCP／UDP 通过 |
+| VMess／VLESS／Trojan WS／gRPC＋TLS | 三个样本 TCP／UDP 通过，使用 legacy JSON |
+| SS2022／传统 SS AEAD | 三个样本 TCP／UDP 通过 |
+| VLESS XHTTP＋TLS | v24.12.31 TCP／UDP 通过；另两个样本未实现该传输 |
+| VLESS-REALITY | 三个样本 JSON 可读取，当前上游核心拒绝旧 TLS ClientHello |
+| Hysteria2 | 当前客户端通过；旧样本未实现该协议 |
+
+实际下载的公开 Release 附件摘要及全部 27 个程序包文件与标签匹配。systemd 容器从公开 Release 更新后，原始及兼容 mKCP 节点源配置和核心 PID 均保持不变，旧式 JSON 导出正常。

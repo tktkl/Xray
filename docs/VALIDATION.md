@@ -69,6 +69,8 @@
 - 新建 mKCP 使用官方 `finalmask`／`mkcp-legacy`，VMess 分享链接带有真实 seed；旧脚本已创建的原始 mKCP 节点保持原数据格式，避免无意断开现有客户端。
 - 本地 Ubuntu 24.04 ARM64 通过 ShellCheck、25 项 Bats、PTY 和完整真实核心／Nginx／本地 CA 测试。额外使用官方且校验摘要的 v1.8.4、v1.8.24、v24.12.31 客户端连接当前服务端，VMess TCP／mKCP、VMess／VLESS／Trojan WS／gRPC、SS2022 和传统 SS AEAD 的 TCP／UDP 往返通过；v24.12.31 的 XHTTP TCP／UDP 也通过。
 - 同时保留 REALITY 边界的反向测试：旧样本可以读取修复后的 JSON，但 TLS 握手被上游拒绝，不计为互通成功。对 `nl` 原有节点的公网测试也得到相同结果；当前客户端访问测试 HTTPS 页面成功。测试没有输出或提交生产节点凭据。
+- 正式发布工作流 [43375059523](https://github.com/tktkl/Xray/actions/runs/43375059523) 的八个系统／架构组合通过，包含新增的三份旧客户端互通检查。公开 Release 两个附件摘要正确，27 个程序包文件和独立入口逐字节匹配标签。
+- 从公开 Release 实际更新到 v0.1.4 后，原始及兼容 mKCP 节点源文件摘要、核心 PID 保持不变，旧式 JSON 导出及配置验证通过。生产 `nl` 的脚本仍是检查时的 v0.1.1；本次未在该机部署修复版本。
 
 ## 测试边界
 
