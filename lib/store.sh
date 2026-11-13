@@ -47,19 +47,26 @@ new_generation() {
     chmod 640 "$CANDIDATE/config.json" || return
     sync_path "$CANDIDATE"
 }
-node_select() {
-    local selector=${1:-} matches count id label
-    local -a options=()
+node_matches() {
+    local selector=${1:-} matches
     if [[ -n $selector ]]; then
-        if jq -e --arg s "$selector" '.nodes[]|select(.id==$s)' <<< "$STATE" >/dev/null; then printf '%s' "$selector"; return; fi
+        if jq -e --arg s "$selector" '.nodes[]|select(.id==$s)' <<< "$STATE" >/dev/null; then
+            jq --arg s "$selector" '[.nodes[]|select(.id==$s)]' <<< "$STATE"; return
+        fi
         matches=$(jq --arg s "$selector" '[.nodes[]|select(.id==$s or .name==$s)]' <<< "$STATE")
         if [[ $(jq length <<< "$matches") == 0 ]]; then
             matches=$(jq --arg s "$selector" '[.nodes[]|select((.name|ascii_downcase|contains($s|ascii_downcase)) or (.id|contains($s)))]' <<< "$STATE")
         fi
     else matches=$(jq '.nodes' <<< "$STATE"); fi
+    printf '%s' "$matches"
+}
+node_select() {
+    local selector=${1:-} matches count id label
+    local -a options=()
+    matches=$(node_matches "$selector") || return
     count=$(jq length <<< "$matches")
     ((count > 0)) || { die '没有匹配的节点。'; return; }
-    if ((count == 1)); then jq -r '.[0].id' <<< "$matches"; return; fi
+    if ((count == 1)) && { [[ -n $selector ]] || [[ ! -t 0 ]]; }; then jq -r '.[0].id' <<< "$matches"; return; fi
     [[ -t 0 ]] || { die '匹配多个节点，请指定精确 ID。'; return; }
     while IFS=$'\t' read -r id label; do options+=("$id" "$label"); done < <(
         jq -r '.[]|[.id,"\(.id)  \(.name)  \(.protocol // "")  :\(.endpoint.port // "")"]|@tsv' <<< "$matches")

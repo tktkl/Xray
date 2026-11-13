@@ -8,7 +8,7 @@ cert_setup() {
         case $1 in --credentials) credentials=$2;; --email) email=$2;; *) die '使用 cert setup [--credentials FILE] [--email EMAIL]'; return 1;; esac
         shift 2
     done
-    email=${email:-$(prompt 'ACME 联系邮箱')}
+    if [[ -z $email ]]; then email=$(prompt_step 'ACME 联系邮箱') || return; fi
     [[ $email =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || { die '无效邮箱。'; return; }
     mkdir -p "$ROOT"
     if [[ -n $credentials ]]; then
@@ -17,7 +17,9 @@ cert_setup() {
         grep -Eq '^dns_cloudflare_api_token[[:space:]]*=[[:space:]]*[^[:space:]]+' "$credentials" || { die '凭据缺少 dns_cloudflare_api_token。'; return; }
     else
         [[ -t 0 ]] || { die '非交互模式请通过 --credentials 引用 0600 凭据文件；不要把 Token 放在命令行。'; return; }
-        read -r -s -p 'Cloudflare API Token: ' token; printf '\n' >&2
+        read -r -s -p 'Cloudflare API Token（0 上一步）: ' token || return 130
+        printf '\n' >&2
+        [[ $token != 0 ]] || return 125
         [[ $token =~ ^[a-zA-Z0-9_-]{20,}$ ]] || { die '无效 Token 格式。'; return; }
         credentials="$ROOT/cloudflare.ini"
         printf 'dns_cloudflare_api_token = %s\n' "$token" | atomic_file "$credentials"

@@ -52,6 +52,8 @@ class Terminal:
     def choose(self, title, value):
         self.expect(title)
         options = self.expect("请输入序号")
+        zero_label = "退出" if title == "Xray 管理菜单" else "上一步"
+        assert f"0) {zero_label}" in options, options
         self.send(value)
         return options
 
@@ -134,14 +136,92 @@ with Terminal(BIN) as terminal:
     before = (ROOT / "current").resolve()
     terminal.choose("Xray 管理菜单", "4")
     terminal.choose("选择节点", "0")
-    terminal.expect("已取消")
+    terminal.expect("已返回上一步")
     assert (ROOT / "current").resolve() == before
     for number, title in (("1", "选择协议"), ("2", "选择节点"), ("8", "选择导出方式"),
                           ("9", "服务管理"), ("10", "证书与域名管理"), ("13", "选择更新组件")):
         terminal.choose("Xray 管理菜单", number)
         terminal.choose(title, "0")
-        terminal.expect("已取消")
+        terminal.expect("已返回上一步")
         assert (ROOT / "current").resolve() == before
+
+    # Back returns to the immediate parent instead of discarding the whole flow.
+    terminal.choose("Xray 管理菜单", "2")
+    terminal.choose("选择节点", "1")
+    terminal.choose("修改节点 n001", "2")
+    terminal.choose("选择协议", "0")
+    terminal.choose("修改节点 n001", "1")
+    terminal.answer("新的公网端口", "0")
+    terminal.choose("修改节点 n001", "0")
+    terminal.choose("选择节点", "0")
+    assert (ROOT / "current").resolve() == before
+
+    terminal.choose("Xray 管理菜单", "7")
+    terminal.choose("选择节点", "2")
+    terminal.choose("设置节点出口", "2")
+    terminal.answer("请粘贴完整的出口分享链接", "0")
+    terminal.choose("设置节点出口", "0")
+    terminal.choose("选择节点", "0")
+    assert node("n002")["outbound"]["protocol"] == "freedom"
+
+    terminal.choose("Xray 管理菜单", "12")
+    terminal.choose("日志管理", "3")
+    terminal.choose("全局日志级别", "0")
+    terminal.choose("日志管理", "0")
+
+    terminal.choose("Xray 管理菜单", "8")
+    terminal.choose("选择导出方式", "2")
+    terminal.choose("选择节点", "0")
+    terminal.choose("选择导出方式", "0")
+
+    terminal.choose("Xray 管理菜单", "13")
+    terminal.choose("选择更新组件", "2")
+    terminal.answer("已发布的脚本版本", "0")
+    terminal.choose("选择更新组件", "0")
+
+    terminal.choose("Xray 管理菜单", "10")
+    terminal.choose("证书与域名管理", "3")
+    terminal.answer("域名", "0")
+    terminal.choose("证书与域名管理", "2")
+    terminal.answer("ACME 联系邮箱", "0")
+    terminal.choose("证书与域名管理", "2")
+    terminal.answer("ACME 联系邮箱", "audit@example.test")
+    terminal.answer("Cloudflare API Token", "0")
+    terminal.choose("证书与域名管理", "0")
+    assert not (ROOT / "cloudflare.ini").exists()
+    assert not (ROOT / "acme.json").exists()
+
+    terminal.choose("Xray 管理菜单", "11")
+    terminal.choose("选择全局 DNS", "7")
+    terminal.answer("DNS 地址", "0")
+    terminal.choose("选择全局 DNS", "0")
+
+    terminal.choose("Xray 管理菜单", "14")
+    terminal.choose("配置检查与恢复", "3")
+    terminal.choose("选择节点", "0")
+    terminal.choose("配置检查与恢复", "0")
+
+    terminal.choose("Xray 管理菜单", "1")
+    terminal.choose("选择协议", "1")
+    terminal.answer("公网端口", "0")
+    terminal.choose("选择协议", "2")
+    terminal.answer("公网端口", "24449")
+    terminal.choose("选择 Shadowsocks 加密方式", "0")
+    terminal.choose("选择协议", "1")
+    terminal.answer("公网端口", "24449")
+    terminal.choose("选择 REALITY SNI", "4")
+    terminal.answer("请输入 SNI 域名", "0")
+    terminal.choose("选择 REALITY SNI", "0")
+    terminal.choose("选择协议", "0")
+    assert (ROOT / "current").resolve() == before
+
+    terminal.choose("Xray 管理菜单", "2")
+    terminal.choose("选择节点", "1")
+    terminal.choose("修改节点 n001", "1")
+    terminal.answer("新的公网端口", "65536")
+    terminal.expect("无效端口")
+    terminal.expect("操作未完成")
+    assert (ROOT / "current").resolve() == before
 
     terminal.choose("Xray 管理菜单", "11")
     terminal.choose("选择全局 DNS", "5")
@@ -235,7 +315,7 @@ for args, required, excluded in (
         options = terminal.choose("修改节点", "0")
         assert all(label in options for label in required), options
         assert all(label not in options for label in excluded), options
-        terminal.finish(130)
+        terminal.finish(125)
 assert (ROOT / "current").resolve() == before
 
 # Every advertised protocol is reachable numerically, with no menu text on stdout.
@@ -259,4 +339,19 @@ with Terminal(BIN, "a") as terminal:
     os.write(terminal.fd, b"\x04")
     terminal.finish(130)
 assert (ROOT / "current").resolve() == before
-print("PASS: numbered protocol/node/change/outbound/DNS/log/service/cert/update menus, cancellation, EOF and CLI compatibility")
+
+# Even a single-node interactive selector offers Back instead of acting immediately.
+run("d", "n002")
+before = (ROOT / "current").resolve()
+with Terminal(BIN) as terminal:
+    terminal.choose("Xray 管理菜单", "4")
+    options = terminal.choose("选择节点", "0")
+    assert "n001" in options
+    terminal.choose("Xray 管理菜单", "0")
+    terminal.finish()
+with Terminal(BIN) as terminal:
+    terminal.expect("请输入序号")
+    os.write(terminal.fd, b"\x04")
+    terminal.finish()
+assert (ROOT / "current").resolve() == before
+print("PASS: numbered menus, immediate-parent Back, explicit Exit, single-node Back, EOF and CLI compatibility")

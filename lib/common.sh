@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-VERSION=0.1.2
+VERSION=0.1.3
 MANAGER_ENTRYPOINT=${XRAY_MANAGER_ENTRYPOINT:-/usr/local/lib/xray-manager/bin/xray}
 ROOT=${XRAY_MANAGER_ROOT:-/var/lib/xray-manager}
 CORE=${XRAY_CORE_BIN:-/usr/local/lib/xray-manager/core/xray}
@@ -42,6 +42,8 @@ prompt() {
 }
 # Menus write their presentation to stderr; stdout contains only the selected value.
 menu_select() {
+    local zero_label=上一步
+    if [[ ${1:-} == --exit ]]; then zero_label=退出; shift; fi
     local title=$1 default=$2 answer key default_number='' index i
     shift 2
     local -a values=() labels=()
@@ -58,18 +60,27 @@ menu_select() {
     fi
     printf '\n%s\n' "$title" >&2
     for i in "${!values[@]}"; do printf '%2d) %s\n' "$((i+1))" "${labels[$i]}" >&2; done
-    printf ' 0) 取消／返回\n' >&2
+    printf ' 0) %s\n' "$zero_label" >&2
     while :; do
         answer=$(prompt '请输入序号' "$default_number") || return
-        [[ $answer != 0 ]] || { note '已取消。'; return 130; }
+        if [[ $answer == 0 ]]; then
+            if [[ $zero_label == 退出 ]]; then note '已退出。'; else note '已返回上一步。'; fi
+            return 125
+        fi
         if [[ $answer =~ ^[0-9]{1,6}$ ]] && ((10#$answer>=1 && 10#$answer<=${#values[@]})); then
             index=$((10#$answer-1)); printf '%s' "${values[$index]}"; return
         fi
         for key in "${values[@]}"; do
             if [[ $answer == "$key" ]]; then printf '%s' "$key"; return; fi
         done
-        note "无效选择，请输入 1–${#values[@]}，或输入 0 取消。"
+        note "无效选择，请输入 1–${#values[@]}，或输入 0 $zero_label。"
     done
+}
+prompt_step() {
+    local answer
+    answer=$(prompt "$1，0 上一步" "${2:-}") || return
+    [[ $answer != 0 ]] || return 125
+    printf '%s' "$answer"
 }
 auto_value() { [[ ${1:-} == auto ]] && printf '' || printf '%s' "${1:-}"; }
 sync_path() { sync -f "$1"; }

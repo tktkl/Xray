@@ -85,35 +85,49 @@ select_ss_method() {
         chacha20-ietf-poly1305 'ChaCha20-IETF-Poly1305' xchacha20-ietf-poly1305 'XChaCha20-IETF-Poly1305'
 }
 select_reality_sni() {
-    local value
-    value=$(menu_select '选择 REALITY SNI' auto \
-        auto '自动检测并选择预设 SNI' \
-        apps.mzstatic.com 'apps.mzstatic.com' xp.apple.com 'xp.apple.com' custom '手动输入其他 SNI') || return
-    if [[ $value == custom ]]; then value=$(prompt '请输入 SNI 域名') || return; fi
-    printf '%s' "$value"
+    local value result
+    while :; do
+        value=$(menu_select '选择 REALITY SNI' auto \
+            auto '自动检测并选择预设 SNI' \
+            apps.mzstatic.com 'apps.mzstatic.com' xp.apple.com 'xp.apple.com' custom '手动输入其他 SNI') || return
+        if [[ $value == custom ]]; then
+            if value=$(prompt_step '请输入 SNI 域名'); then :
+            else result=$?; [[ $result == 125 ]] && continue; return "$result"; fi
+        fi
+        printf '%s' "$value"; return
+    done
+}
+select_and_build_node() {
+    local old=${1:-'{}'} protocol result
+    while :; do
+        protocol=$(select_protocol) || return
+        if build_node_interactive "$protocol" "$old"; then return
+        else result=$?; fi
+        [[ $result == 125 ]] || return "$result"
+    done
 }
 build_node_interactive() {
     local protocol=$1 old=${2:-'{}'} canonical domain port path method sni remote remote_port address
     canonical=$(canonical_protocol "$protocol") || return
     local -a args=()
     if [[ $canonical == *-TLS ]]; then
-        domain=$(prompt '证书域名' "$(jq -r '.endpoint.domain // empty' <<< "$old")") || return
-        path=$(prompt '路径／gRPC 服务名（auto 自动生成）' auto) || return
-        port=$(prompt '公网 TCP 端口' 443) || return
+        domain=$(prompt_step '证书域名' "$(jq -r '.endpoint.domain // empty' <<< "$old")") || return
+        path=$(prompt_step '路径／gRPC 服务名（auto 自动生成）' auto) || return
+        port=$(prompt_step '公网 TCP 端口' 443) || return
         valid_port "$port" || { die '无效端口。'; return; }
         args=("$domain" auto "$path")
     else
-        port=$(prompt '公网端口（auto 随机分配）' "$(jq -r '.endpoint.port // "auto"' <<< "$old")") || return
+        port=$(prompt_step '公网端口（auto 随机分配）' "$(jq -r '.endpoint.port // "auto"' <<< "$old")") || return
         args=("$port")
         case $canonical in
             VLESS-REALITY) sni=$(select_reality_sni) || return; args+=(auto "$sni");;
             Shadowsocks) method=$(select_ss_method) || return; args+=(auto "$method");;
             Hysteria2)
-                domain=$(prompt '证书域名' "$(jq -r '.endpoint.domain // empty' <<< "$old")") || return
+                domain=$(prompt_step '证书域名' "$(jq -r '.endpoint.domain // empty' <<< "$old")") || return
                 args+=(auto --domain "$domain");;
             Dokodemo-Door)
-                remote=$(prompt '转发目标地址' "$(jq -r '.remote.address // empty' <<< "$old")") || return
-                remote_port=$(prompt '转发目标端口') || return
+                remote=$(prompt_step '转发目标地址' "$(jq -r '.remote.address // empty' <<< "$old")") || return
+                remote_port=$(prompt_step '转发目标端口') || return
                 args+=("$remote" "$remote_port");;
         esac
     fi

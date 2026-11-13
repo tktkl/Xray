@@ -27,7 +27,7 @@ amd64 主机将 `arm64` 换成 `amd64`。缓存只涵盖核心与规则文件，
 独立引导器只下载固定标签的公开 Release，无需 GitHub Token：
 
 ```bash
-sudo bash bootstrap.sh --version v0.1.2
+sudo bash bootstrap.sh --version v0.1.3
 ```
 
 未发布版本、网络失败、摘要异常或包路径不安全时停止，不回退到分支源码。可以通过 `--sha256` 指定另行核实的程序包摘要。摘要校验用于完整性检查，不能证明代码没有后门。
@@ -47,7 +47,7 @@ docker compose down
 
 amd64 主机将下载参数改为 `amd64`。默认镜像基于 Ubuntu 24.04，可通过 `TEST_BASE` 和 `TEST_TAG` 选择其他测试环境。
 
-`tests/run.sh` 包含 ShellCheck、Bats、PTY 交互、真实 Xray 和 Nginx／本地 CA 集成测试。`tests/integration/interactive.py` 用模拟终端输入序号，覆盖协议与修改菜单、参数提示、取消、EOF、输错重选及命令参数兼容。`NET_ADMIN` 用于给容器回环接口添加测试地址；systemd 容器使用 privileged 和私有 cgroup。
+`tests/run.sh` 包含 ShellCheck、Bats、PTY 交互、真实 Xray 和 Nginx／本地 CA 集成测试。`tests/integration/interactive.py` 用模拟终端输入序号，覆盖协议与修改菜单、参数提示、逐层返回、主菜单退出、单节点返回、EOF、输错重选及命令参数兼容，并验证返回时不提交节点或全局修改。`NET_ADMIN` 用于给容器回环接口添加测试地址；systemd 容器使用 privileged 和私有 cgroup。
 
 证书测试使用本地 CA，不使用生产 Cloudflare Token。真实 DNS-01 签发需要明确配置的测试域名与凭据。已执行的结果及测试边界见 [验证记录](VALIDATION.md)。
 
@@ -58,12 +58,12 @@ amd64 主机将下载参数改为 `amd64`。默认镜像基于 Ubuntu 24.04，�
 发布标签必须与 `lib/common.sh` 中的版本一致。本地打包：
 
 ```bash
-bash scripts/package-release.sh v0.1.2
+bash scripts/package-release.sh v0.1.3
 ```
 
 默认在 `dist/` 生成：
 
-- `xray-manager-v0.1.2.tar.gz`：程序源码包。
+- `xray-manager-v0.1.3.tar.gz`：程序源码包。
 - `install.sh`：独立安装入口。
 - `SHA256SUMS`：两个附件的 SHA256。
 
