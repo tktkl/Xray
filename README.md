@@ -12,7 +12,7 @@
 
 ```bash
 apt-get update && apt-get install -y curl ca-certificates
-curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://github.com/tktkl/Xray/releases/latest/download/install.sh && bash xray-install.sh
+curl -fL --proto '=https' --proto-redir '=https' -H 'Cache-Control: no-cache' -o xray-install.sh https://github.com/tktkl/Xray/releases/latest/download/install.sh && bash xray-install.sh
 ```
 
 安装后直接运行 `xray`。
@@ -21,7 +21,7 @@ curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://gith
 
 ```bash
 sudo apt-get update && sudo apt-get install -y curl ca-certificates
-curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://github.com/tktkl/Xray/releases/latest/download/install.sh && sudo bash xray-install.sh
+curl -fL --proto '=https' --proto-redir '=https' -H 'Cache-Control: no-cache' -o xray-install.sh https://github.com/tktkl/Xray/releases/latest/download/install.sh && sudo bash xray-install.sh
 ```
 
 安装后运行 `sudo xray`。普通用户没有 sudo 权限时，先执行 `su -` 切换到 root，再按 root 用户的步骤安装；安装和管理均需要 root 权限。

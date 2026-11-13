@@ -83,8 +83,11 @@
 
 - `update sh`、`U`、`update.sh` 省略版本时解析 GitHub 最新正式版，校验最终地址属于本仓库且是固定版本标签，再下载程序包和验证 SHA256。显式版本仍可使用；已是最新正式版时不替换程序文件。
 - Ubuntu 24.04 容器通过 ShellCheck、31 项 Bats、PTY 和完整真实 Xray／Nginx／本地 CA 测试。新增测试覆盖查询失败、异常跳转地址、无效参数、显式版本固定下载、摘要错误及所有快捷命令；终端测试覆盖无版本提示和新菜单逐层返回。
+- Debian 12 本地容器另行通过 ShellCheck、31 项 Bats 和完整 PTY 导航回归。
 - 真实 systemd 容器以本地 Release HTTP 夹具验证指定版本更新和不带版本号的实际升级，核心 PID、节点源文件摘要及已提交配置版本保持不变。重复执行最新更新和别名不会重复替换脚本；停止状态操作、恢复、timer 及卸载回归通过。
-- GitHub `/releases/latest` 的真实 HTTPS 跳转可以解析到本仓库正式版；新安装命令使用 `/releases/latest/download/install.sh`，下载到的入口仍固定自身发布版本。发布包在线升级结果在正式附件发布后另行验证。
+- 正式发布工作流 [43378461481](https://github.com/tktkl/Xray/actions/runs/43378461481) 的八个系统／架构组合全部通过。公开 Release 的两个附件摘要正确，27 个程序包文件及独立入口逐字节匹配发布标签。
+- 从实际公开 v0.1.5 在线更新到 v0.1.6，核心 PID、节点源文件摘要和已提交配置版本保持不变；真实 GitHub 最新版查询及 `update sh`、`U`、`update.sh` 均正确识别当前版本。配置校验和标准客户端导出通过。
+- 新安装命令使用 `/releases/latest/download/install.sh`，不填写版本号；下载的入口仍固定自身发布版本。观察到 GitHub 在发布初期曾返回缓存的上一版入口，README 请求增加 `Cache-Control: no-cache` 后，实际下载内容匹配 v0.1.6 正式附件。
 
 ## 测试边界
 
