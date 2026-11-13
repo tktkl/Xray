@@ -32,23 +32,16 @@ def server_inbound($settings):
    settings:inbound_settings,streamSettings:server_stream($settings),
    sniffing:{enabled:true,destOverride:["http","tls","quic"],routeOnly:true}};
 def outbound: .outbound + {tag:out_tag};
-def client_stream($client_profile):
+def client_stream:
   . as $n | base_stream +
-  (if .security=="reality" then {security:"reality",realitySettings:{serverName:.sni,fingerprint:"chrome",publicKey:.credentials.public_key,shortId:.credentials.short_id}}
+  (if .security=="reality" then {security:"reality",realitySettings:{serverName:.sni,fingerprint:"chrome",password:.credentials.public_key,shortId:.credentials.short_id}}
    elif .security=="nginx" or .security=="tls" then {security:"tls",tlsSettings:{serverName:.endpoint.domain,allowInsecure:false,useSystemCA:true,alpn:(if .kind=="hysteria" then ["h3"] elif .network=="ws" then ["http/1.1"] else ["h2","http/1.1"] end)}}
    else {security:"none"} end) |
   if .network=="hysteria" then .hysteriaSettings.auth=$n.credentials.password
   elif .network=="ws" then .wsSettings.host=$n.endpoint.domain
-  else . end |
-  if $client_profile=="legacy" then
-    if .network=="ws" then .wsSettings.headers={Host:$n.endpoint.domain}|del(.wsSettings.host)
-    elif .network=="kcp" then
-      if ($n.kcp_compat // "native")!="legacy" then error("此旧节点使用原始 mKCP；如需兼容旧式 mKCP，请单独修改该节点 seed 并重新导入客户端")
-      else .kcpSettings.seed=$n.credentials.seed|.kcpSettings.header={type:"none"}|del(.finalmask) end
-    else . end
   else . end;
-def client_outbound($client_profile):
-  {tag:"proxy",protocol:.kind,streamSettings:client_stream($client_profile),
+def client_outbound:
+  {tag:"proxy",protocol:.kind,streamSettings:client_stream,
    settings:(if .kind=="vless" or .kind=="vmess" then
      {vnext:[{address:.endpoint.address,port:.endpoint.port,users:[({id:.credentials.id} + (if .kind=="vless" then {encryption:"none",flow:(if .security=="reality" then "xtls-rprx-vision" else "" end)} else {security:"auto"} end))]}]}
    elif .kind=="trojan" or .kind=="shadowsocks" then {servers:[{address:.endpoint.address,port:.endpoint.port,password:.credentials.password,method:.credentials.method}]}

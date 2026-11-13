@@ -10,8 +10,7 @@ help_text() {
   c, change [节点] [修改项] [值...]
   d, del, rm [节点]                dd, ddel 节点...
   i, info [节点]                  list
-  url, qr [节点]                  client, genc [节点] [current|legacy]
-  legacy 仅切换客户端 JSON 字段格式，不设置版本上下限。
+  url, qr [节点]                  client, genc [节点]
   ob [节点] [direct|分享链接]       c [节点] outbound [direct|分享链接]
 
 协议参数（auto 自动生成；TLS 协议需要 Cloudflare 凭据）：
@@ -387,16 +386,10 @@ menu_node_action() {
     done
 }
 menu_share() {
-    local choice result id
+    local choice result
     while :; do
-        choice=$(menu_select '选择导出方式' url url '分享链接' qr '终端二维码' client 'Xray 客户端 JSON' legacy 'Xray 客户端 JSON（旧式字段）') || return
-        set -- "$choice"
-        if [[ $choice == legacy ]]; then
-            load_state
-            if id=$(node_select ''); then set -- client "$id" legacy
-            else result=$?; [[ $result == 125 ]] && continue; return "$result"; fi
-        fi
-        if menu_run "$@"; then return
+        choice=$(menu_select '选择导出方式' url url '分享链接' qr '终端二维码' client 'Xray 客户端 JSON') || return
+        if menu_run "$choice"; then return
         else result=$?; [[ $result == 125 ]] || return "$result"; fi
     done
 }
@@ -528,13 +521,14 @@ main() {
         d|del|rm|dd|ddel) command_delete "$@";;
         list) command_list;;
         i|info|url|qr|client|genc|debug)
+            if [[ $command == client || $command == genc ]] && (($#>1)); then die "用法：xray $command [节点]"; return; fi
             id=$(node_select "${1:-}") || return
             node=$(jq --arg id "$id" '.nodes[]|select(.id==$id)' <<< "$STATE")
             case $command in
                 i|info) node_info "$node";; url) share_uri "$node";;
                 qr) need qrencode; share_uri "$node" | qrencode -t ANSIUTF8;;
-                client) node=$(client_json "$node" "${2:-current}") || return; jq -n --argjson o "$node" '{inbounds:[{listen:"127.0.0.1",port:1080,protocol:"socks",settings:{udp:true}}],outbounds:[$o]}' ;;
-                genc) client_json "$node" "${2:-current}";; debug) json_redact <<< "$node";;
+                client) node=$(client_json "$node") || return; jq -n --argjson o "$node" '{inbounds:[{listen:"127.0.0.1",port:1080,protocol:"socks",settings:{udp:true}}],outbounds:[$o]}' ;;
+                genc) client_json "$node";; debug) json_redact <<< "$node";;
             esac;;
         new|full|port|id|passwd|pass|password|method|ssm|ss-method|ss_method|key|sni|host|path|seed|type|header|web|username|address|dda|ddp|dp|dynamicport|dynamic-port|publickey|privatekey|servername|servernames|kcpseed|kcp-seed|kcp_seed|header-type|header_type|door-addr|door_addr|door-port|door_port|proxy-site)
             command_change "${1:-}" "$command" "${@:2}";;

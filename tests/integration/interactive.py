@@ -175,7 +175,8 @@ with Terminal(BIN) as terminal:
     terminal.choose("选择导出方式", "0")
 
     terminal.choose("Xray 管理菜单", "8")
-    terminal.choose("选择导出方式", "4")
+    options = terminal.choose("选择导出方式", "3")
+    assert "4)" not in options and "旧式" not in options
     terminal.choose("选择节点", "0")
     terminal.choose("选择导出方式", "0")
 
@@ -261,7 +262,9 @@ with Terminal(BIN, "c", "n002") as terminal:
     terminal.choose("选择 Shadowsocks 加密方式", "4")
     terminal.finish()
 assert node("n002")["credentials"]["method"] == "aes-128-gcm"
-assert json.loads(run("client", "n001", "legacy").stdout)["outbounds"][0]["streamSettings"]["realitySettings"]["publicKey"]
+assert json.loads(run("client", "n001").stdout)["outbounds"][0]["streamSettings"]["realitySettings"]["password"]
+removed = subprocess.run([BIN, "client", "n001", "legacy"], stdin=subprocess.DEVNULL, capture_output=True, text=True)
+assert removed.returncode != 0 and not removed.stdout and "用法" in removed.stderr
 
 with Terminal(BIN, "sni", "n001") as terminal:
     terminal.choose("选择 REALITY SNI", "3")

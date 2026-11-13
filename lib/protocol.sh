@@ -67,8 +67,8 @@ canonical_protocol() {
 }
 select_protocol() {
     menu_select '选择协议' reality \
-        reality 'VLESS-REALITY（无需自有域名，需兼容当前 REALITY 握手）' \
-        ss 'Shadowsocks／SS2022（旧客户端可选传统 AEAD）' \
+        reality 'VLESS-REALITY（无需自有域名）' \
+        ss 'Shadowsocks／SS2022' \
         tcp 'VMess TCP' kcp 'VMess mKCP' \
         ws 'VMess WS＋TLS（需要域名）' grpc 'VMess gRPC＋TLS（需要域名）' \
         vws 'VLESS WS＋TLS（需要域名）' vgrpc 'VLESS gRPC＋TLS（需要域名）' \

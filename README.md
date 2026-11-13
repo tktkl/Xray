@@ -12,7 +12,7 @@
 
 ```bash
 apt-get update && apt-get install -y curl ca-certificates
-curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://github.com/tktkl/Xray/releases/download/v0.1.4/install.sh && bash xray-install.sh
+curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://github.com/tktkl/Xray/releases/download/v0.1.5/install.sh && bash xray-install.sh
 ```
 
 安装后直接运行 `xray`。
@@ -21,7 +21,7 @@ curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://gith
 
 ```bash
 sudo apt-get update && sudo apt-get install -y curl ca-certificates
-curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://github.com/tktkl/Xray/releases/download/v0.1.4/install.sh && sudo bash xray-install.sh
+curl -fL --proto '=https' --proto-redir '=https' -o xray-install.sh https://github.com/tktkl/Xray/releases/download/v0.1.5/install.sh && sudo bash xray-install.sh
 ```
 
 安装后运行 `sudo xray`。普通用户没有 sudo 权限时，先执行 `su -` 切换到 root，再按 root 用户的步骤安装；安装和管理均需要 root 权限。
@@ -89,17 +89,10 @@ xray a reality 24446 --name mobile --address 203.0.113.10
 | `xray url n001` | 输出分享链接，复制到客户端导入 |
 | `xray qr n001` | 在终端显示二维码，供客户端扫描 |
 | `xray client n001` | 输出 Xray 客户端 JSON 配置 |
-| `xray client n001 legacy` | 输出使用旧式字段的客户端 JSON |
 
 端口转发等不支持分享链接的类型会给出提示。
 
-脚本不设置客户端版本上下限。旧客户端优先导入分享链接，直接使用 JSON 时可选 `legacy` 格式；此选项只切换字段格式，不改变服务端，也不会让客户端支持它未实现的协议。最新核心的 REALITY 有底层 TLS 握手要求，部分旧客户端即使支持早期 REALITY 也不能连接，可为它们另外添加 SS AEAD 或 WS／gRPC 节点。详见 [客户端兼容说明](docs/CLIENT-COMPATIBILITY.md)。
-
-例如添加使用传统 AEAD 加密的 SS 节点：
-
-```bash
-xray a ss 24454 auto chacha20-ietf-poly1305
-```
+脚本不设置客户端最低／最高版本，客户端 JSON 只提供标准格式。实际连接仍取决于客户端是否支持对应协议和核心的握手规则，详见 [客户端与版本规则](docs/CLIENT-COMPATIBILITY.md)。
 
 ## 修改一个节点
 
@@ -255,10 +248,10 @@ xray cert delete node.example.com
 更新脚本需要指定已发布的版本标签，例如：
 
 ```bash
-xray update sh v0.1.4
+xray update sh v0.1.5
 ```
 
-`v0.1.4` 是当前版本示例，有新版时换成对应标签。可在 [Releases](https://github.com/tktkl/Xray/releases) 查看已发布版本。
+`v0.1.5` 是当前版本示例，有新版时换成对应标签。可在 [Releases](https://github.com/tktkl/Xray/releases) 查看已发布版本。
 
 已安装旧版的用户执行上面的更新命令后，重新运行 `xray` 即可使用编号菜单，已有节点会保留。
 

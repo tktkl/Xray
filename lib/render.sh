@@ -5,10 +5,9 @@ render_config() {
 }
 client_json() {
     # Reuse the same protocol rendering definitions for server and client.
-    local defs profile=${2:-current}
-    [[ $profile == current || $profile == legacy ]] || { die '客户端格式可选 current 或 legacy；不检查或限制客户端版本。'; return; }
+    local defs
     defs=$(sed '/^\. as \$state/,$d' "$MANAGER_HOME/jq/render.jq")
-    jq --arg client_profile "$profile" "$defs client_outbound(\$client_profile)" <<< "$1"
+    jq "$defs client_outbound" <<< "$1"
 }
 share_uri() {
     local node=$1 scheme id address port host security type name path query method password auth
